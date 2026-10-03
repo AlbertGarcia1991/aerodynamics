@@ -34,7 +34,7 @@ class FakeWorker {
   respond(msg: WorkerRequest, reply: (r: Reply) => void) {
     switch (msg.type) {
       case 'solve':
-        reply({ type: 'solved', solution: { status: 'success', bodies: [], total: { fx: 0, fy: 0, lift: 0, drag: 0, moment: 0, circulation: 0 }, diagnostics: { panel: null, timings: { prepareMs: 0, assembleMs: 0, solveMs: 0, forcesMs: 0, totalMs: 1 }, systemReused: false, elementCount: msg.scene.elements.length, bodyCount: 0, totalCirculation: 0, netOutflow: 0 }, warnings: [], error: null, assumptions: [] }, elapsedMs: 1 });
+        reply({ type: 'solved', solution: { status: 'success', bodies: [], elements: [], total: { fx: 0, fy: 0, lift: 0, drag: 0, moment: 0, circulation: 0 }, diagnostics: { panel: null, timings: { prepareMs: 0, assembleMs: 0, solveMs: 0, forcesMs: 0, totalMs: 1 }, systemReused: false, elementCount: msg.scene.elements.length, bodyCount: 0, totalCirculation: 0, netOutflow: 0 }, warnings: [], error: null, assumptions: [] }, elapsedMs: 1 });
         break;
       case 'sample':
         reply({ type: 'sampled', elapsedMs: 1 });

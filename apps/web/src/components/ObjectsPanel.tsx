@@ -1,5 +1,6 @@
 /** Scene tree (PRD §31): freestream, elements, bodies; select / show / lock / delete / duplicate. */
 import { useState } from 'react';
+import { ResizeHandle } from './ResizeHandle';
 import { useSimulationStore } from '@/state/simulationStore';
 import { useUIStore } from '@/state/uiStore';
 import { useSolverStore } from '@/state/solverStore';
@@ -143,6 +144,7 @@ export function ObjectsPanel() {
 
   return (
     <aside className="panel panel--left" aria-label="Scene objects">
+      <ResizeHandle panel="left" label="Resize scene panel" />
       <header className="panel__header">
         <h2>Scene</h2>
         <span className="panel__count">{scene.elements.length + scene.bodies.length}</span>

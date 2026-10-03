@@ -13,7 +13,20 @@ export interface Toast {
   message: string;
 }
 
+export type ResizablePanel = 'left' | 'right' | 'bottom';
+
+/** Default, minimum and maximum size of each resizable panel, in CSS px. */
+export const PANEL_LIMITS: Record<ResizablePanel, { initial: number; min: number; max: number }> = {
+  left: { initial: 260, min: 180, max: 520 },
+  right: { initial: 320, min: 260, max: 640 },
+  bottom: { initial: 280, min: 140, max: 800 },
+};
+
 export interface UIStore {
+  /** Current panel sizes in px (left/right widths, bottom height). */
+  panelSizes: Record<ResizablePanel, number>;
+  setPanelSize(panel: ResizablePanel, px: number): void;
+  resetPanelSize(panel: ResizablePanel): void;
   selectedIds: string[];
   hoverId: string | null;
   tool: Tool;
@@ -50,6 +63,35 @@ export interface UIStore {
 }
 
 const THEME_KEY = 'aeroflow.theme';
+const SIZES_KEY = 'aeroflow.panel-sizes';
+
+function clampSize(panel: ResizablePanel, px: number): number {
+  const { min, max } = PANEL_LIMITS[panel];
+  // The bottom panel may never take more than 70 % of the window.
+  const cap = panel === 'bottom' && typeof window !== 'undefined' ? Math.min(max, window.innerHeight * 0.7) : max;
+  return Math.round(Math.min(cap, Math.max(min, px)));
+}
+
+function loadSizes(): Record<ResizablePanel, number> {
+  const sizes = { left: PANEL_LIMITS.left.initial, right: PANEL_LIMITS.right.initial, bottom: PANEL_LIMITS.bottom.initial };
+  try {
+    const raw = JSON.parse(localStorage.getItem(SIZES_KEY) ?? '{}') as Partial<Record<ResizablePanel, number>>;
+    for (const k of ['left', 'right', 'bottom'] as const) {
+      if (typeof raw[k] === 'number' && Number.isFinite(raw[k])) sizes[k] = clampSize(k, raw[k]!);
+    }
+  } catch {
+    /* storage unavailable or corrupt: use defaults */
+  }
+  return sizes;
+}
+
+function saveSizes(sizes: Record<ResizablePanel, number>): void {
+  try {
+    localStorage.setItem(SIZES_KEY, JSON.stringify(sizes));
+  } catch {
+    /* ignore */
+  }
+}
 
 function loadTheme(): Theme {
   try {
@@ -64,6 +106,18 @@ function loadTheme(): Theme {
 let toastCounter = 0;
 
 export const useUIStore = create<UIStore>((set, get) => ({
+  panelSizes: loadSizes(),
+  setPanelSize(panel, px) {
+    const sizes = { ...get().panelSizes, [panel]: clampSize(panel, px) };
+    if (sizes[panel] === get().panelSizes[panel]) return;
+    saveSizes(sizes);
+    set({ panelSizes: sizes });
+  },
+  resetPanelSize(panel) {
+    const sizes = { ...get().panelSizes, [panel]: PANEL_LIMITS[panel].initial };
+    saveSizes(sizes);
+    set({ panelSizes: sizes });
+  },
   selectedIds: [],
   hoverId: null,
   tool: 'select',

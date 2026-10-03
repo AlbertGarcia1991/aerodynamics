@@ -226,9 +226,23 @@ export interface Diagnostics {
   netOutflow: number;
 }
 
+/** Lagally force on an elementary singularity: the force needed to hold it fixed. */
+export interface ElementResult {
+  id: string;
+  name: string;
+  position: Vec2;
+  /** Force per unit span [N/m]. */
+  force: Vec2;
+  lift: number;
+  drag: number;
+  /** Velocity induced at the element by everything else [m/s]. */
+  externalVelocity: Vec2;
+}
+
 export interface Solution {
   status: SolveStatus;
   bodies: BodyResult[];
+  elements: ElementResult[];
   total: TotalForces;
   diagnostics: Diagnostics;
   warnings: Warning[];

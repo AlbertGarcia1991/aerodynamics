@@ -346,6 +346,13 @@ pub fn concept_help() -> &'static [HelpTopic] {
             definition: "D = Fx·cos α + Fy·sin α. Treat a computed CD as a numerical-accuracy indicator, not as an aerodynamic result.",
         },
         HelpTopic {
+            id: "elementForces",
+            title: "Forces on singularities (Lagally theorem)",
+            meaning: "A source, sink, vortex or doublet has no surface to integrate pressure over, yet it still exchanges momentum with the flow around it. The Lagally theorem gives that force from the velocity induced at the singularity by everything else — the freestream, the other elements and the bodies.",
+            importance: "It shows where lift comes from without any body at all: a clockwise vortex in a stream is pushed upwards by exactly ρU∞|Γ|. It also shows that forces come in equal and opposite pairs — a source near a body is pulled towards it while the body is pulled towards the source. Read the arrows as the force needed to hold each singularity fixed; a free vortex or source in a real fluid would instead be carried along by the flow.",
+            definition: "With V the velocity induced at the element by everything else: vortex F = ρ V × Γẑ = ρΓ(V_y, −V_x); source F = −ρΛV (sink: +ρΛV); doublet F = ρκ (ê·∇)V with ê the doublet axis. A uniform stream has no location and no force. Per unit span, N/m.",
+        },
+        HelpTopic {
             id: "streamlines",
             title: "Streamlines",
             meaning: "Curves everywhere tangent to the velocity field. In a steady flow they are the paths fluid particles actually follow.",

@@ -763,3 +763,143 @@ fn bench_panel_counts() {
         println!("|   field 256×171: far-field {approx:.1} ms, exact {exact:.1} ms |");
     }
 }
+
+// ───────────────────────── Lagally forces vs. pressure integration ─────────────────────────
+
+/// In still fluid the total momentum flux at infinity vanishes, so the force on
+/// a singularity near a body must be equal and opposite to the pressure force on
+/// the body. The two sides come from independent computations — Lagally at a
+/// point vs. pressure integrated over panels — so agreement validates both.
+fn momentum_balance(element: Element, n: usize) -> (Vec2, Vec2) {
+    let mut s = Scene::new(
+        "balance",
+        FlowConditions {
+            velocity: 0.0,
+            angle: 0.0,
+            density: 1.2,
+            pressure: 0.0,
+        },
+    );
+    let mut b = SceneBody::new("cyl", "Cylinder", BodyGeometry::Circle { radius: 1.0 });
+    b.panels.count = n;
+    b.circulation = CirculationSetting::None;
+    s.bodies.push(b);
+    s.elements.push(SceneElement {
+        id: "e".into(),
+        name: "E".into(),
+        visible: true,
+        locked: false,
+        element,
+    });
+    let mut sim = Simulation::with_scene(s, no_clock);
+    let sol = sim.solve();
+    assert_ne!(sol.status, SolveStatus::Error, "{:?}", sol.error);
+    let body = Vec2::new(sol.bodies[0].forces.fx, sol.bodies[0].forces.fy);
+    (sol.elements[0].force, body)
+}
+
+/// Exact force on a source `m` at distance `c` from the centre of a cylinder of
+/// radius `a` in still fluid (Milne-Thomson circle theorem: image source `m` at
+/// `a²/c`, image sink `−m` at the centre). Directed towards the cylinder.
+fn source_near_cylinder_exact(m: f64, c: f64, a: f64, rho: f64) -> f64 {
+    let b = a * a / c;
+    rho * m * m / (2.0 * PI) * (1.0 / (c - b) - 1.0 / c)
+}
+
+/// Exact force on a vortex `Γ` at distance `c` from a non-circulating cylinder
+/// (images: `−Γ` at `a²/c`, `+Γ` at the centre). Perpendicular to the radius.
+fn vortex_near_cylinder_exact(g: f64, c: f64, a: f64, rho: f64) -> f64 {
+    let b = a * a / c;
+    rho * g * g / (2.0 * PI) * (1.0 / (c - b) - 1.0 / c)
+}
+
+#[test]
+fn source_near_a_cylinder_matches_the_circle_theorem_and_balances() {
+    let pos = Vec2::new(2.0, 0.6);
+    let (on_source, on_body) = momentum_balance(
+        Element::Source {
+            position: pos,
+            strength: 3.0,
+        },
+        240,
+    );
+    let exact = source_near_cylinder_exact(3.0, pos.norm(), 1.0, 1.2);
+    println!(
+        "source near cylinder: Lagally {:.5}, body {:.5}, exact {exact:.5}",
+        on_source.norm(),
+        on_body.norm()
+    );
+    // Observed at N = 240: Lagally +0.56 %, body −0.49 % (first-order convergence).
+    assert!(
+        (on_source.norm() - exact).abs() / exact < 1e-2,
+        "Lagally vs circle theorem"
+    );
+    assert!(
+        (on_body.norm() - exact).abs() / exact < 1e-2,
+        "body pressure vs circle theorem"
+    );
+    // Directed exactly towards the cylinder centre, and equal-and-opposite.
+    assert!(on_source.normalized().dot(-pos.normalized()) > 1.0 - 1e-6);
+    assert!((on_source + on_body).norm() / exact < 1.5e-2);
+}
+
+#[test]
+fn vortex_near_a_cylinder_matches_the_circle_theorem_and_balances() {
+    let pos = Vec2::new(-1.8, 1.0);
+    let (on_vortex, on_body) = momentum_balance(
+        Element::Vortex {
+            position: pos,
+            circulation: 4.0,
+        },
+        240,
+    );
+    let exact = vortex_near_cylinder_exact(4.0, pos.norm(), 1.0, 1.2);
+    println!(
+        "vortex near cylinder: Lagally {:.5}, body {:.5}, exact {exact:.5}",
+        on_vortex.norm(),
+        on_body.norm()
+    );
+    assert!(
+        (on_vortex.norm() - exact).abs() / exact < 1e-2,
+        "Lagally vs circle theorem"
+    );
+    assert!(
+        (on_body.norm() - exact).abs() / exact < 1e-2,
+        "body pressure vs circle theorem"
+    );
+    // Radial: the vortex is pulled towards the cylinder like its image.
+    assert!(on_vortex.normalized().dot(pos.normalized()).abs() > 1.0 - 1e-6);
+    assert!((on_vortex + on_body).norm() / exact < 1.5e-2);
+}
+
+#[test]
+fn doublet_near_a_cylinder_balances_the_pressure_force_on_it() {
+    let (on_doublet, on_body) = momentum_balance(
+        Element::Doublet {
+            position: Vec2::new(2.2, -0.4),
+            strength: 2.0,
+            orientation: 0.5,
+        },
+        240,
+    );
+    println!("doublet near cylinder: Lagally {on_doublet:?}, body {on_body:?}");
+    let rel = (on_doublet + on_body).norm() / on_doublet.norm();
+    assert!(rel < 2e-2, "momentum imbalance {rel}");
+}
+
+#[test]
+fn source_near_a_cylinder_balance_converges_with_panel_count() {
+    let imbalance = |n| {
+        let (a, b) = momentum_balance(
+            Element::Source {
+                position: Vec2::new(1.6, 0.0),
+                strength: 2.0,
+            },
+            n,
+        );
+        (a + b).norm() / a.norm()
+    };
+    let (e60, e240) = (imbalance(60), imbalance(240));
+    println!("source balance: N=60 {e60:.3e}, N=240 {e240:.3e}");
+    assert!(e240 < e60, "no convergence: {e60} -> {e240}");
+}

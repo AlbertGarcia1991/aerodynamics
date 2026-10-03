@@ -19,8 +19,8 @@ pub use scene::{
     SceneElement, SCENE_FORMAT_VERSION,
 };
 pub use simulation::{
-    no_clock, BodyResult, Diagnostics, NowFn, Probe, Simulation, Solution, SolveStatus, Timings,
-    Warning, WarningSeverity, ASSUMPTIONS,
+    no_clock, BodyResult, Diagnostics, ElementResult, NowFn, Probe, Simulation, Solution,
+    SolveStatus, Timings, Warning, WarningSeverity, ASSUMPTIONS,
 };
 pub use sweep::{SweepBodyPoint, SweepConfig, SweepParameter, SweepPoint, SweepResult, SweepRun};
 

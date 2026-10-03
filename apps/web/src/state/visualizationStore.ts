@@ -42,6 +42,8 @@ export interface VisualizationStore {
   showAxes: boolean;
   showLegend: boolean;
   showSingularityMarkers: boolean;
+  /** Force arrows on bodies (resultant + lift/drag) and elements (Lagally). */
+  showForces: boolean;
   /** Field grid columns; 'auto' derives from canvas width. */
   resolution: 'auto' | 128 | 192 | 256 | 384;
   /** Manually placed streamline seeds (world). */
@@ -56,7 +58,7 @@ export interface VisualizationStore {
   setIsolines(on: boolean): void;
   updateStreamlines(patch: Partial<StreamlineSettings>): void;
   updateVectors(patch: Partial<VectorSettings>): void;
-  toggle(key: 'showGrid' | 'showAxes' | 'showLegend' | 'showSingularityMarkers'): void;
+  toggle(key: 'showGrid' | 'showAxes' | 'showLegend' | 'showSingularityMarkers' | 'showForces'): void;
   setResolution(r: VisualizationStore['resolution']): void;
   addSeed(p: Vec2): void;
   removeSeed(index: number): void;
@@ -89,6 +91,7 @@ export const useVisualizationStore = create<VisualizationStore>((set) => ({
   showAxes: true,
   showLegend: true,
   showSingularityMarkers: true,
+  showForces: true,
   resolution: 'auto',
   seeds: [],
   revision: 0,

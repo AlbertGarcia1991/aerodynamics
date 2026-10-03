@@ -38,9 +38,10 @@ static host — the worker and `.wasm` are emitted as hashed assets).
 | **Fields** | velocity magnitude / u / v, pressure, Cp, vorticity, potential φ, stream function ψ — WebGL2, perceptual colour maps, contour bands, isolines |
 | **Overlays** | evenly spaced streamlines (Jobard–Lefer) with animated particles, velocity vectors, manual seeds, hover probe |
 | **Results** | lift, drag, Fx, Fy, moment, CL, CD, Cm per body and in total; Kutta–Joukowski cross-check; surface Cp / velocity / pressure plots |
+| **Forces** | force arrows on the canvas (body resultant with lift/drag components; shared scale with a key); forces on elementary singularities from the **Lagally theorem**, validated against the circle theorem and against the pressure force on nearby bodies |
 | **Sweeps** | angle of attack, freestream speed, body circulation or element strength — CL/Cm curves and drag polar, cancellable |
 | **Files** | `.aeroflow.json` save/open (versioned); CSV export of forces, surface data, geometry and fields; PNG canvas and SVG charts |
-| **UX** | undo/redo, keyboard shortcuts (press `?`), contextual help, light/dark/system themes, compact layout for tablet and phone |
+| **UX** | resizable side and bottom panels (drag an edge; double-click resets; sizes remembered), undo/redo, keyboard shortcuts (press `?`), contextual help, light/dark/system themes, compact layout for tablet and phone |
 
 Try the shipped coordinate file `examples/naca2412-selig.dat` via **Add → Import coordinates**.
 
@@ -103,9 +104,9 @@ SKIP_E2E=1 scripts/verify.sh # without the browser suites
 
 | Suite | Count | Covers |
 | --- | --- | --- |
-| Rust | 281 | analytical acceptance, solver/geometry units, TS↔Rust scene contract on every example |
+| Rust | 294 | analytical acceptance, solver/geometry units, TS↔Rust scene contract on every example |
 | Vitest | 50 | domain helpers, viewport math, colour maps, worker client coalescing, CSV, example fixtures, module boundaries |
-| Playwright | 33 + 3 | PRD core flows, visual baselines, axe WCAG 2.2 AA scans, keyboard-only use, responsive layouts, performance, production-build smoke |
+| Playwright | 39 + 3 | PRD core flows, visual baselines, axe WCAG 2.2 AA scans, keyboard-only use, responsive layouts, performance, production-build smoke |
 
 Visual baselines live in `apps/web/e2e/visual.spec.ts-snapshots/`; after an intended
 visual change regenerate with `npx playwright test e2e/visual.spec.ts --update-snapshots=all`.

@@ -290,6 +290,7 @@ kbd {
 
 /* ───────────────────────────── Panels ───────────────────────────── */
 .panel {
+  position: relative;
   display: flex;
   flex-direction: column;
   min-height: 0;
@@ -553,6 +554,10 @@ select.input {
   height: 15px;
   margin: 0;
 }
+.side-list > * {
+  /* Never squash controls to fit a short panel — scroll the column instead. */
+  flex-shrink: 0;
+}
 .segmented {
   display: inline-flex;
   border: 1px solid var(--border);
@@ -662,6 +667,7 @@ select.input {
 
 /* ───────────────────────────── Bottom panel ───────────────────────────── */
 .bottom {
+  position: relative;
   background: var(--surface);
   border-top: 1px solid var(--border);
   display: flex;
@@ -1157,11 +1163,17 @@ select.input {
   color: var(--text-muted);
   border-bottom: 1px solid var(--border);
 }
-.chart svg {
+.chart__plot {
   flex: 1;
-  width: 100%;
-  height: 100%;
+  min-width: 0;
   min-height: 0;
+  position: relative;
+  overflow: hidden;
+}
+.chart svg {
+  position: absolute;
+  inset: 0;
+  display: block;
   font-family: var(--font-mono);
   font-size: 11px;
 }
@@ -1207,6 +1219,7 @@ select.input {
 }
 .side-list {
   width: 240px;
+  flex-shrink: 0;
   border-right: 1px solid var(--border);
   padding: 10px 12px;
   display: flex;
@@ -1260,9 +1273,6 @@ select.input {
     gap: 4px;
     padding: 0 6px;
   }
-  .bottom {
-    --bottom-h: 300px;
-  }
 }
 @media (max-width: 720px) {
   .btn__label {
@@ -1306,4 +1316,87 @@ select.input {
 /* On the selection tint, faint text drops below 4.5:1 in dark mode (4.32); muted clears it (4.98). */
 .tree-row.is-selected .tree-row__sub {
   color: var(--text-muted);
+}
+
+/* ───────────────────────────── Panel resize handles ───────────────────────────── */
+.resize-handle {
+  position: absolute;
+  z-index: 15;
+  touch-action: none;
+  background: transparent;
+  transition: background var(--transition);
+}
+.resize-handle::after {
+  /* thin visible line centred in a wider grab area */
+  content: '';
+  position: absolute;
+  background: transparent;
+  transition: background var(--transition);
+}
+.resize-handle:hover::after,
+.resize-handle:focus-visible::after,
+body.is-resizing-x .resize-handle--left::after,
+body.is-resizing-x .resize-handle--right::after,
+body.is-resizing-y .resize-handle--bottom::after {
+  background: var(--accent);
+}
+.resize-handle:focus-visible {
+  box-shadow: none;
+}
+.resize-handle--left,
+.resize-handle--right {
+  top: 0;
+  bottom: 0;
+  width: 7px;
+  cursor: col-resize;
+}
+/* Panels clip overflow, so handles sit fully inside the panel, on its inner edge. */
+.resize-handle--left {
+  right: 0;
+}
+.resize-handle--right {
+  left: 0;
+}
+.resize-handle--left::after,
+.resize-handle--right::after {
+  top: 0;
+  bottom: 0;
+  width: 3px;
+}
+.resize-handle--left::after {
+  right: 0;
+}
+.resize-handle--right::after {
+  left: 0;
+}
+.resize-handle--bottom {
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 7px;
+  cursor: row-resize;
+}
+.resize-handle--bottom::after {
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 3px;
+}
+/* While dragging: keep the resize cursor everywhere and stop text selection. */
+body.is-resizing-x,
+body.is-resizing-x * {
+  cursor: col-resize !important;
+  user-select: none !important;
+}
+body.is-resizing-y,
+body.is-resizing-y * {
+  cursor: row-resize !important;
+  user-select: none !important;
+}
+@media (max-width: 960px) {
+  /* Side panels are overlays in compact mode; only the bottom panel resizes. */
+  .resize-handle--left,
+  .resize-handle--right {
+    display: none;
+  }
 }

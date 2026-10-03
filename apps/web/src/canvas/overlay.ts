@@ -3,10 +3,10 @@
  * element glyphs, selection handles. Everything crisp and theme-aware; the
  * continuous field lives on the WebGL layer underneath.
  */
-import type { Scene, SceneBody, SceneElement, StreamlinesResult, Vec2, VectorFieldResult } from '@/domain/types';
+import type { Scene, SceneBody, SceneElement, Solution, StreamlinesResult, Vec2, VectorFieldResult } from '@/domain/types';
 import { elementPosition } from '@/domain/scene';
 import type { VisualizationStore } from '@/state/visualizationStore';
-import { bodyRadius, currentPolygon } from './bodyCache';
+import { bodyRadius, currentPolygon, reposePoint } from './bodyCache';
 import { formatCoordinate, niceStep, visibleBounds, worldToScreen, type Viewport } from './viewport';
 import { sampleColormap } from '@/render/colormaps';
 
@@ -25,6 +25,7 @@ export interface ThemeColors {
   select: string;
   handle: string;
   surface: string;
+  force: string;
 }
 
 export function readThemeColors(): ThemeColors {
@@ -45,6 +46,7 @@ export function readThemeColors(): ThemeColors {
     select: v('--select'),
     handle: v('--handle'),
     surface: v('--surface'),
+    force: v('--force'),
   };
 }
 
@@ -69,6 +71,8 @@ export interface OverlayState {
   drag: DragVisual;
   pendingAdd: string | null;
   reducedMotion: boolean;
+  /** Latest solution, for force arrows (may lag the scene by a frame during a drag). */
+  solution: Solution | null;
 }
 
 export const GLYPH_RADIUS = 11;
@@ -85,6 +89,7 @@ export function drawOverlay(ctx: CanvasRenderingContext2D, s: OverlayState): voi
   drawBodies(ctx, s);
   drawElements(ctx, s);
   drawSeeds(ctx, s);
+  if (s.viz.showForces && s.solution) drawForces(ctx, s);
   if (s.drag.box) drawBox(ctx, s);
   if (s.pendingAdd && s.drag.pointer) drawGhost(ctx, s);
   drawScaleBar(ctx, s);
@@ -543,4 +548,130 @@ function drawGhost(ctx: CanvasRenderingContext2D, s: OverlayState) {
   ctx.font = '11px system-ui, sans-serif';
   ctx.textAlign = 'left';
   ctx.fillText('click to place · Esc to cancel', p.x + 18, p.y + 18);
+}
+
+// ───────────────────────────── Force arrows ─────────────────────────────
+
+/** Longest arrow on screen, px; every arrow shares one scale so lengths compare. */
+export const FORCE_ARROW_MAX_PX = 90;
+
+interface ForceArrow {
+  at: Vec2; // world
+  force: Vec2; // N/m
+  /** Wind-axis components drawn as thinner dashed arrows (bodies only). */
+  lift?: Vec2;
+  drag?: Vec2;
+  label: string;
+}
+
+function fmtForce(v: number): string {
+  const a = Math.abs(v);
+  return a >= 1000 || (a < 0.01 && a > 0) ? v.toExponential(2) : v.toFixed(a < 1 ? 3 : 2);
+}
+
+/** Collect the arrows to draw from the latest solution, at current object positions. */
+export function forceArrows(scene: Scene, solution: Solution, flowAngle: number): ForceArrow[] {
+  const out: ForceArrow[] = [];
+  const lift = Vec2Of(-Math.sin(flowAngle), Math.cos(flowAngle));
+  const drag = Vec2Of(Math.cos(flowAngle), Math.sin(flowAngle));
+  for (const r of solution.bodies) {
+    const body = scene.bodies.find((b) => b.id === r.id);
+    if (!body || !body.visible) continue;
+    const f = { x: r.forces.fx, y: r.forces.fy };
+    out.push({
+      at: reposePoint(body, r.forces.reference.point),
+      force: f,
+      lift: { x: lift.x * r.forces.lift, y: lift.y * r.forces.lift },
+      drag: { x: drag.x * r.forces.drag, y: drag.y * r.forces.drag },
+      label: `${fmtForce(Math.hypot(f.x, f.y))} N/m`,
+    });
+  }
+  for (const r of solution.elements ?? []) {
+    const el = scene.elements.find((e) => e.id === r.id);
+    if (!el || !el.visible || el.element.type === 'uniformFlow') continue;
+    out.push({ at: el.element.position, force: r.force, label: `${fmtForce(Math.hypot(r.force.x, r.force.y))} N/m` });
+  }
+  return out;
+}
+
+function Vec2Of(x: number, y: number): Vec2 {
+  return { x, y };
+}
+
+/** px per N/m for the current set of arrows. */
+export function forceScale(arrows: ForceArrow[]): number {
+  const max = arrows.reduce((m, a) => Math.max(m, Math.hypot(a.force.x, a.force.y)), 0);
+  return max > 0 ? FORCE_ARROW_MAX_PX / max : 0;
+}
+
+function drawForceArrow(ctx: CanvasRenderingContext2D, from: Vec2, f: Vec2, scale: number, width: number, dashed: boolean) {
+  const len = Math.hypot(f.x, f.y) * scale;
+  if (len < 3) return;
+  const ux = f.x / Math.hypot(f.x, f.y);
+  const uy = -f.y / Math.hypot(f.x, f.y); // screen y points down
+  const tx = from.x + ux * len;
+  const ty = from.y + uy * len;
+  const head = Math.min(9, 3 + len * 0.18);
+  ctx.lineWidth = width;
+  ctx.setLineDash(dashed ? [4, 3] : []);
+  ctx.beginPath();
+  ctx.moveTo(from.x, from.y);
+  ctx.lineTo(tx - ux * head * 0.6, ty - uy * head * 0.6);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.beginPath();
+  ctx.moveTo(tx, ty);
+  ctx.lineTo(tx - ux * head - uy * head * 0.55, ty - uy * head + ux * head * 0.55);
+  ctx.lineTo(tx - ux * head + uy * head * 0.55, ty - uy * head - ux * head * 0.55);
+  ctx.closePath();
+  ctx.fill();
+}
+
+function drawForces(ctx: CanvasRenderingContext2D, s: OverlayState) {
+  const arrows = forceArrows(s.scene, s.solution!, s.scene.conditions.angle);
+  const scale = forceScale(arrows);
+  if (scale === 0) return;
+  ctx.strokeStyle = s.colors.force;
+  ctx.fillStyle = s.colors.force;
+  for (const a of arrows) {
+    const p = worldToScreen(a.at, s.vp);
+    if (a.lift) drawForceArrow(ctx, p, a.lift, scale, 1.3, true);
+    if (a.drag) drawForceArrow(ctx, p, a.drag, scale, 1.3, true);
+    drawForceArrow(ctx, p, a.force, scale, 2.4, false);
+    // Origin dot and magnitude label at the arrow tip.
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 2.5, 0, Math.PI * 2);
+    ctx.fill();
+    const n = Math.hypot(a.force.x, a.force.y);
+    if (n * scale >= 3) {
+      const tip = { x: p.x + (a.force.x / n) * n * scale, y: p.y - (a.force.y / n) * n * scale };
+      ctx.font = '11px ui-monospace, SFMono-Regular, Menlo, monospace';
+      ctx.textAlign = a.force.x >= 0 ? 'left' : 'right';
+      ctx.textBaseline = 'middle';
+      const tx = tip.x + (a.force.x >= 0 ? 6 : -6);
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = s.colors.surface;
+      ctx.strokeText(a.label, tx, tip.y);
+      ctx.fillText(a.label, tx, tip.y);
+      ctx.strokeStyle = s.colors.force;
+    }
+  }
+  // Scale key above the length scale bar.
+  const keyN = niceForce(FORCE_ARROW_MAX_PX / 2 / scale);
+  const keyPx = keyN * scale;
+  const x = 14;
+  const y = s.vp.height - 60; // clear of the length scale bar and its label
+  drawForceArrow(ctx, { x, y }, { x: keyN, y: 0 }, scale, 2, false);
+  ctx.font = '10px ui-monospace, SFMono-Regular, Menlo, monospace';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(`${fmtForce(keyN)} N/m`, x + keyPx + 6, y);
+}
+
+/** Round to 1, 2 or 5 × 10ⁿ for the scale key. */
+function niceForce(v: number): number {
+  if (!(v > 0)) return 1;
+  const pow = Math.pow(10, Math.floor(Math.log10(v)));
+  const m = v / pow;
+  return (m < 1.5 ? 1 : m < 3.5 ? 2 : m < 7.5 ? 5 : 10) * pow;
 }

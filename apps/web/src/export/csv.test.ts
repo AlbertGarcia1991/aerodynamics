@@ -14,6 +14,7 @@ const solution: Solution = {
   total: { fx: 1, fy: 2, lift: 2, drag: 1, moment: -0.5, circulation: -3 },
   diagnostics: { panel: null, timings: { prepareMs: 0, assembleMs: 0, solveMs: 0, forcesMs: 0, totalMs: 0 }, systemReused: false, elementCount: 0, bodyCount: 1, totalCirculation: -3, netOutflow: 0 },
   warnings: [], error: null, assumptions: [],
+  elements: [{ id: 'v', name: 'Vortex 01', position: { x: 1, y: 0 }, force: { x: 0, y: 3.675 }, lift: 3.675, drag: 0, externalVelocity: { x: 1, y: 0 } }],
 };
 
 describe('csv exporters', () => {
@@ -23,6 +24,10 @@ describe('csv exporters', () => {
     expect(lines[0]).toMatch(/^body,lift_N_per_m/);
     expect(lines[1]).toContain('"Wing, A"');
     expect(lines[2]).toMatch(/^TOTAL,2,1,/);
+    // Element (Lagally) section after a blank line.
+    expect(lines[3]).toBe('');
+    expect(lines[4]).toMatch(/^element,lift_N_per_m/);
+    expect(lines[5]).toBe('"Vortex 01",3.675,0,0,3.675,1,0,1,0');
   });
 
   it('writes geometry as x,y rows', () => {

@@ -394,6 +394,22 @@ impl FlowField {
         v
     }
 
+    /// Exact velocity at `p` induced by everything **except** element `skip`:
+    /// the freestream, every other element and every body. This is the
+    /// "external" velocity the Lagally theorem needs for the force on `skip`.
+    pub fn velocity_excluding_element(&self, p: Vec2, skip: usize) -> Vec2 {
+        let mut v = self.conditions.freestream();
+        for (i, e) in self.elements.iter().enumerate() {
+            if i != skip {
+                v = v + e.velocity(p, 0.0);
+            }
+        }
+        for b in &self.bodies {
+            v = v + b.velocity(p, &FieldEvalOptions::EXACT);
+        }
+        v
+    }
+
     /// Total velocity at `p` (PRD §16 `evaluate_velocity`).
     pub fn velocity(&self, p: Vec2) -> Vec2 {
         self.velocity_with(p, &FieldEvalOptions::EXACT)

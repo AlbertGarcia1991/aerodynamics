@@ -5,6 +5,7 @@
  * inviscid-drag caveat shown contextually (PRD §25).
  */
 import { useMemo } from 'react';
+import { ResizeHandle } from './ResizeHandle';
 import { useSimulationStore } from '@/state/simulationStore';
 import { useUIStore } from '@/state/uiStore';
 import { useSolverStore } from '@/state/solverStore';
@@ -79,6 +80,8 @@ function ElementForm({ item }: { item: SceneElement }) {
   const allWarnings = useSolverStore((s) => s.solution?.warnings ?? EMPTY);
   const warnings = useMemo(() => allWarnings.filter((w) => w.objectId === item.id), [allWarnings, item.id]);
   const select = useUIStore((s) => s.select);
+  const result = useSolverStore((s) => s.solution?.elements?.find((e) => e.id === item.id));
+  const openHelp = useUIStore((s) => s.openHelp);
   if (!descriptor) return <p className="panel__empty">Loading…</p>;
   return (
     <div className="form">
@@ -112,6 +115,28 @@ function ElementForm({ item }: { item: SceneElement }) {
           );
         })}
       </div>
+      {result && (
+        <div className="form__section">
+          <h3>
+            Force on this element <HelpButton topic="elementForces" />
+          </h3>
+          <dl className="kv">
+            <dt>|F|</dt><dd>{fmt(Math.hypot(result.force.x, result.force.y))}</dd><dd className="unit">N/m</dd>
+            <dt>Fx</dt><dd>{fmt(result.force.x)}</dd><dd className="unit">N/m</dd>
+            <dt>Fy</dt><dd>{fmt(result.force.y)}</dd><dd className="unit">N/m</dd>
+            <dt>Lift</dt><dd>{fmt(result.lift)}</dd><dd className="unit">N/m</dd>
+            <dt>Drag</dt><dd>{fmt(result.drag)}</dd><dd className="unit">N/m</dd>
+            <dt>Local velocity</dt><dd>{fmt(Math.hypot(result.externalVelocity.x, result.externalVelocity.y))}</dd><dd className="unit">m/s</dd>
+          </dl>
+          <div className="callout">
+            <IconInfo size={14} />
+            <span>
+              Lagally force: what it takes to <b>hold</b> this singularity fixed, from the velocity induced at it by everything else. A free one would move with the flow instead.{' '}
+              <button className="link-btn" onClick={() => openHelp('elementForces')}>Why?</button>
+            </span>
+          </div>
+        </div>
+      )}
       {warnings.map((w, i) => (
         <div key={i} className={`callout callout--${w.severity === 'warning' ? 'warning' : ''}`}>
           <IconWarning size={14} />
@@ -421,6 +446,7 @@ export function PropertiesPanel() {
 
   return (
     <aside className="panel panel--right" aria-label="Properties and results">
+      <ResizeHandle panel="right" label="Resize properties panel" />
       <header className="panel__header">
         <h2>{selected.length === 0 ? 'Properties' : 'Properties'}</h2>
         <span className="panel__count" style={{ fontFamily: 'var(--font-sans)', color: 'var(--text)' }}>{title}</span>

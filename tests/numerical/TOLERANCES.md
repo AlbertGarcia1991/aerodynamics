@@ -185,3 +185,35 @@ without bias.
 | Far-field point-singularity substitution at 12× size ratio | relative velocity error < 1e-2 outside 1.3 radii | 1e-2 |
 | Vortex core softening `r² → r² + a²` | `∫ω dA` recovers `Γ` to 2e-4 | 2e-4 |
 | Near-wall mask of 0.75 panel lengths | hides log-singular band at panel vertices; nearest unmasked `Cp` on a 0.1-cell grid −2.375 vs exact −2.33 at r = 1.1 | — |
+
+## Forces on singularities — Lagally theorem (added 2026-10-03)
+
+`crates/flow-core/src/lagally.rs` (9 tests) and `crates/solver/tests/analytical.rs`.
+
+| Check | Observed | Bound |
+| --- | --- | --- |
+| Vortex in a uniform stream vs. `ρU∞|Γ|`, perpendicular to the flow | < 1e-12 | 1e-12 |
+| Source / sink in a stream vs. `∓ρΛU∞` | < 1e-12 | 1e-12 |
+| Two sources, two vortices: Newton's third law | < 1e-12 | 1e-12 |
+| Two sources attract with `ρΛ_AΛ_B/(2πd)` | < 1e-12 | 1e-12 |
+| Doublet in a uniform stream (the analytic cylinder) | < 1e-6 | 1e-6 |
+| Doublet vs. source–sink pair limit (ε = 1e-3, external field only) | < 1e-4 rel. | 1e-4 |
+
+**Against an exact solution and against the panel method** — still fluid, a
+non-circulating unit cylinder, N = 240 panels. Exact values from the Milne-Thomson
+circle theorem (images at `a²/c` and at the centre):
+
+| Singularity | Lagally on the singularity | Pressure force on the cylinder | Exact | Bound |
+| --- | --- | --- | --- | --- |
+| Source Λ = 3 at (2, 0.6) | 0.24637 (+0.56 %) | 0.24380 (−0.49 %) | 0.24500 | 1 % each |
+| Vortex Γ = 4 at (−1.8, 1) | 0.46059 (+0.56 %) | 0.45576 (−0.50 %) | 0.45803 | 1 % each |
+| Doublet κ = 2 at (2.2, −0.4) | balance within 1.3 % | | — | 2 % |
+
+The two sides are independent computations — the velocity induced at a point by
+the panels vs. surface pressure integrated over them — and they **bracket** the
+exact value from opposite sides. Directions are exact (towards the centre for the
+source, radial for the vortex). The momentum imbalance converges at **first order**:
+5.0 % at 60 panels, 1.24 % at 240 (2.0 % at the UI's default 120, asserted < 3 % in
+`e2e/forces.spec.ts`). For comparison, the isolated-body results above converge at
+second order; the extra error here comes from resolving a strong, localised
+disturbance on the side of the cylinder facing the singularity.

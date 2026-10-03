@@ -64,3 +64,19 @@ export function bodyRadius(body: SceneBody): number {
   for (const p of poly) r = Math.max(r, Math.hypot(p.x - body.position.x, p.y - body.position.y));
   return r;
 }
+
+/**
+ * Map a world point recorded at the last solve (e.g. a body's moment reference
+ * point) to where it is now, applying the same transform delta as the contour.
+ */
+export function reposePoint(body: SceneBody, p: Vec2): Vec2 {
+  const c = cache.get(body.id);
+  if (!c) return p;
+  const dr = body.rotation - c.rotation;
+  const ds = body.scale / (c.scale || 1);
+  const x = (p.x - c.position.x) * ds;
+  const y = (p.y - c.position.y) * ds;
+  const cos = Math.cos(dr);
+  const sin = Math.sin(dr);
+  return { x: x * cos - y * sin + body.position.x, y: x * sin + y * cos + body.position.y };
+}

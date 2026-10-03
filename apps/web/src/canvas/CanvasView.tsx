@@ -153,6 +153,7 @@ function VizToolbar() {
         <button className={`btn${viz.streamlines.show ? ' is-active' : ''}`} onClick={() => viz.updateStreamlines({ show: !viz.streamlines.show })} title="Streamlines (L)">Streamlines</button>
         <button className={`btn${viz.streamlines.particles ? ' is-active' : ''}`} onClick={() => viz.updateStreamlines({ particles: !viz.streamlines.particles })} title="Animate particles along streamlines" disabled={!viz.streamlines.show}>Particles</button>
         <button className={`btn${viz.vectors.show ? ' is-active' : ''}`} onClick={() => viz.updateVectors({ show: !viz.vectors.show })} title="Velocity vectors (V)">Vectors</button>
+        <button className={`btn${viz.showForces ? ' is-active' : ''}`} onClick={() => viz.toggle('showForces')} title="Force arrows on bodies and elements (O)" aria-pressed={viz.showForces}>Forces</button>
         <button className={`btn${viz.showGrid ? ' is-active' : ''}`} onClick={() => viz.toggle('showGrid')} title="Grid (G)"><IconGrid size={14} /></button>
         <button className={`btn${more ? ' is-active' : ''}`} onClick={() => setMore((m) => !m)} title="More display options"><IconLayers size={14} /></button>
         <span style={{ width: 1, background: 'var(--border)', margin: '2px 2px' }} />
@@ -354,6 +355,7 @@ export function CanvasView() {
         drag: { box: interaction.view().box, pointer: interaction.pointer },
         pendingAdd: ui.pendingAdd,
         reducedMotion: reducedMotionMq.matches,
+        solution: solver.solution,
       });
     };
     raf = requestAnimationFrame(frame);

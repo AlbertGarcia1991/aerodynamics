@@ -35,6 +35,7 @@ export function App() {
   const leftOpen = useUIStore((s) => s.leftPanelOpen);
   const rightOpen = useUIStore((s) => s.rightPanelOpen);
   const bottomOpen = useUIStore((s) => s.bottomPanelOpen);
+  const panelSizes = useUIStore((s) => s.panelSizes);
   const initError = useSolverStore((s) => s.initError);
   const ready = useSolverStore((s) => s.ready);
   const started = useRef(false);
@@ -119,6 +120,7 @@ export function App() {
   return (
     <div
       className="app"
+      style={{ '--left-w': `${panelSizes.left}px`, '--right-w': `${panelSizes.right}px`, '--bottom-h': `${panelSizes.bottom}px` } as React.CSSProperties}
       data-left={leftOpen ? 'open' : 'closed'}
       data-right={rightOpen ? 'open' : 'closed'}
       data-bottom={bottomOpen ? 'open' : 'closed'}

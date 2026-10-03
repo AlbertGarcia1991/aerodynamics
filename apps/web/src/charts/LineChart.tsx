@@ -3,7 +3,7 @@
  * series, optional inverted y (for Cp), and a hover read-out. Written in-house
  * so that it matches the app's typography and themes exactly and stays light.
  */
-import { useMemo, useRef, useState } from 'react';
+import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { downloadText } from '@/export/download';
 
 /** Serialise a chart's SVG with the current theme colours baked in (PRD §52 "plots as SVG"). */
@@ -89,8 +89,25 @@ export function LineChart({
 }: LineChartProps) {
   const [hover, setHover] = useState<{ px: number; x: number; values: { label: string; y: number; color: string }[] } | null>(null);
   const svgRef = useRef<SVGSVGElement>(null);
-  const W = 640;
-  const H = 300;
+  const boxRef = useRef<HTMLDivElement>(null);
+  // Draw in real pixels: the viewBox always matches the box, so text and
+  // markers are never stretched, whatever the panel's aspect ratio.
+  const [size, setSize] = useState({ w: 640, h: 300 });
+  useLayoutEffect(() => {
+    const el = boxRef.current;
+    if (!el) return;
+    const measure = () => {
+      const w = Math.max(160, Math.round(el.clientWidth));
+      const h = Math.max(120, Math.round(el.clientHeight));
+      setSize((s) => (s.w === w && s.h === h ? s : { w, h }));
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  const W = size.w;
+  const H = size.h;
   const m = { l: 56, r: 16, t: 14, b: 40 };
 
   const { xs, ys } = useMemo(() => {
@@ -126,8 +143,9 @@ export function LineChart({
     return invertY ? m.t + f * (H - m.t - m.b) : H - m.b - f * (H - m.t - m.b);
   };
 
-  const xt = niceTicks(xs[0], xs[1], 6);
-  const yt = niceTicks(ys[0], ys[1], 5);
+  // Tick density follows the drawn size (~one label per 90 px across, 40 px up).
+  const xt = niceTicks(xs[0], xs[1], Math.max(2, Math.min(10, Math.round((W - m.l - m.r) / 90))));
+  const yt = niceTicks(ys[0], ys[1], Math.max(2, Math.min(8, Math.round((H - m.t - m.b) / 40))));
 
   const onMove = (e: React.MouseEvent<SVGSVGElement>) => {
     const svg = svgRef.current;
@@ -153,7 +171,7 @@ export function LineChart({
   };
 
   return (
-    <>
+    <div className="chart__plot" ref={boxRef}>
     {exportName && (
       <button
         className="btn btn--ghost btn--sm"
@@ -168,7 +186,8 @@ export function LineChart({
     <svg
       ref={svgRef}
       viewBox={`0 0 ${W} ${H}`}
-      preserveAspectRatio="none"
+      width={W}
+      height={H}
       role="img"
       aria-label={ariaLabel ?? `${yLabel} versus ${xLabel}`}
       onMouseMove={onMove}
@@ -220,6 +239,6 @@ export function LineChart({
         </g>
       )}
     </svg>
-    </>
+    </div>
   );
 }

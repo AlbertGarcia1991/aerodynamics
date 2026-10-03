@@ -28,6 +28,15 @@ export function forcesCsv(sol: Solution): string {
   }
   const t = sol.total;
   rows.push(['TOTAL', n(t.lift), n(t.drag), n(t.fx), n(t.fy), n(t.moment), '', '', '', n(t.circulation), '', '', '', ''].join(','));
+  const elements = sol.elements ?? [];
+  if (elements.length > 0) {
+    // Lagally forces: the force needed to hold each singularity fixed.
+    rows.push('');
+    rows.push('element,lift_N_per_m,drag_N_per_m,Fx_N_per_m,Fy_N_per_m,x_m,y_m,Vx_external_m_per_s,Vy_external_m_per_s');
+    for (const e of elements) {
+      rows.push([JSON.stringify(e.name), n(e.lift), n(e.drag), n(e.force.x), n(e.force.y), n(e.position.x), n(e.position.y), n(e.externalVelocity.x), n(e.externalVelocity.y)].join(','));
+    }
+  }
   return rows.join('\n') + '\n';
 }
 

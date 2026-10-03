@@ -1,5 +1,6 @@
 /** Bottom panel (PRD §28–§30, §44): surface plots, polars, diagnostics, data. */
 import { useEffect, useMemo, useState } from 'react';
+import { ResizeHandle } from './ResizeHandle';
 import { useSimulationStore } from '@/state/simulationStore';
 import { useSolverStore } from '@/state/solverStore';
 import { useUIStore, type BottomTab } from '@/state/uiStore';
@@ -313,31 +314,57 @@ function DataTab() {
   const solution = useSolverStore((s) => s.solution);
   const scene = useSimulationStore((s) => s.scene);
   const openExport = () => useUIStore.getState().openDialog('export');
-  if (!solution || solution.bodies.length === 0) {
+  const openHelp = useUIStore((s) => s.openHelp);
+  const hasBodies = !!solution && solution.bodies.length > 0;
+  const hasElements = !!solution && (solution.elements ?? []).length > 0;
+  if (!solution || (!hasBodies && !hasElements)) {
     return (
       <div className="panel__empty" style={{ flex: 1 }}>
-        Force tables appear here when bodies are present. <button className="link-btn" onClick={openExport}>Export field data or the simulation file</button> at any time.
+        Force tables appear here when bodies or flow elements are present. <button className="link-btn" onClick={openExport}>Export field data or the simulation file</button> at any time.
       </div>
     );
   }
   return (
-    <div style={{ flex: 1, padding: '8px 12px', overflow: 'auto' }}>
-      <table className="table" aria-label="Forces per body">
-        <thead>
-          <tr><th>Body</th><th>Lift [N/m]</th><th>Drag [N/m]</th><th>Fx [N/m]</th><th>Fy [N/m]</th><th>M [N·m/m]</th><th>CL</th><th>CD</th><th>Cm</th><th>Γ [m²/s]</th><th>Panels</th></tr>
-        </thead>
-        <tbody>
-          {solution.bodies.map((b) => (
-            <tr key={b.id}>
-              <td>{b.name}</td><td>{fmt(b.forces.lift)}</td><td>{fmt(b.forces.drag)}</td><td>{fmt(b.forces.fx)}</td><td>{fmt(b.forces.fy)}</td><td>{fmt(b.forces.moment)}</td>
-              <td>{fmt(b.forces.cl, 4)}</td><td>{fmt(b.forces.cd, 5)}</td><td>{fmt(b.forces.cm, 4)}</td><td>{fmt(b.forces.circulation)}</td><td>{b.panelCount}</td>
+    <div style={{ flex: 1, padding: '8px 12px', overflow: 'auto' }} tabIndex={0} role="region" aria-label="Force tables">
+      {hasBodies && (
+        <table className="table" aria-label="Forces per body">
+          <thead>
+            <tr><th>Body</th><th>Lift [N/m]</th><th>Drag [N/m]</th><th>Fx [N/m]</th><th>Fy [N/m]</th><th>M [N·m/m]</th><th>CL</th><th>CD</th><th>Cm</th><th>Γ [m²/s]</th><th>Panels</th></tr>
+          </thead>
+          <tbody>
+            {solution.bodies.map((b) => (
+              <tr key={b.id}>
+                <td>{b.name}</td><td>{fmt(b.forces.lift)}</td><td>{fmt(b.forces.drag)}</td><td>{fmt(b.forces.fx)}</td><td>{fmt(b.forces.fy)}</td><td>{fmt(b.forces.moment)}</td>
+                <td>{fmt(b.forces.cl, 4)}</td><td>{fmt(b.forces.cd, 5)}</td><td>{fmt(b.forces.cm, 4)}</td><td>{fmt(b.forces.circulation)}</td><td>{b.panelCount}</td>
+              </tr>
+            ))}
+            <tr className="is-total">
+              <td>Total (bodies)</td><td>{fmt(solution.total.lift)}</td><td>{fmt(solution.total.drag)}</td><td>{fmt(solution.total.fx)}</td><td>{fmt(solution.total.fy)}</td><td>{fmt(solution.total.moment)}</td><td /><td /><td /><td>{fmt(solution.total.circulation)}</td><td />
             </tr>
-          ))}
-          <tr className="is-total">
-            <td>Total</td><td>{fmt(solution.total.lift)}</td><td>{fmt(solution.total.drag)}</td><td>{fmt(solution.total.fx)}</td><td>{fmt(solution.total.fy)}</td><td>{fmt(solution.total.moment)}</td><td /><td /><td /><td>{fmt(solution.total.circulation)}</td><td />
-          </tr>
-        </tbody>
-      </table>
+          </tbody>
+        </table>
+      )}
+      {hasElements && (
+        <>
+          <table className="table" aria-label="Forces on elements" style={{ marginTop: hasBodies ? 14 : 0 }}>
+            <thead>
+              <tr><th>Element</th><th>Lift [N/m]</th><th>Drag [N/m]</th><th>Fx [N/m]</th><th>Fy [N/m]</th><th>|F| [N/m]</th><th>Vₓ ext [m/s]</th><th>V_y ext [m/s]</th></tr>
+            </thead>
+            <tbody>
+              {solution.elements.map((e) => (
+                <tr key={e.id}>
+                  <td>{e.name}</td><td>{fmt(e.lift)}</td><td>{fmt(e.drag)}</td><td>{fmt(e.force.x)}</td><td>{fmt(e.force.y)}</td><td>{fmt(Math.hypot(e.force.x, e.force.y))}</td>
+                  <td>{fmt(e.externalVelocity.x)}</td><td>{fmt(e.externalVelocity.y)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <p className="form__hint" style={{ marginTop: 6 }}>
+            Element forces follow the Lagally theorem: the force needed to hold each singularity fixed, from the velocity induced at it by everything else.{' '}
+            <button className="link-btn" onClick={() => openHelp('elementForces')}>Explain</button>
+          </p>
+        </>
+      )}
       <div className="form__row" style={{ marginTop: 10 }}>
         <button className="btn btn--sm" onClick={() => downloadText(`${safeFilename(scene.name)}_forces.csv`, forcesCsv(solution), 'text/csv')}><IconDownload size={14} /> Forces CSV</button>
         <button className="btn btn--sm" onClick={openExport}><IconDownload size={14} /> More exports…</button>
@@ -367,6 +394,7 @@ export function AnalysisPanel() {
   ];
   return (
     <section className="bottom" aria-label="Analysis">
+      {open && <ResizeHandle panel="bottom" label="Resize analysis panel" />}
       <div className="bottom__tabs">
         <IconChart size={15} style={{ color: 'var(--text-faint)', marginRight: 4 }} />
         <div className="bottom__tablist" role="tablist" aria-label="Analysis views">

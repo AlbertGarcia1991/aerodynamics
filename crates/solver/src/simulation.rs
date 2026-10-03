@@ -3,9 +3,9 @@
 use crate::prepare::{prepare_body, PreparedBody};
 use crate::scene::Scene;
 use aeroflow_flow_core::{
-    integrate_forces, surface_points, total_forces, trace_set, BodyForces, FieldEvalOptions,
-    FieldType, FlowField, GridDefinition, PanelBody, ScalarField, SeedingConfig, Streamline,
-    StreamlineConfig, SurfacePoint, TotalForces, VectorField,
+    element_force, integrate_forces, surface_points, total_forces, trace_set, BodyForces,
+    FieldEvalOptions, FieldType, FlowField, GridDefinition, PanelBody, ScalarField, SeedingConfig,
+    Streamline, StreamlineConfig, SurfacePoint, TotalForces, VectorField,
 };
 use aeroflow_geometry::{CornerInfo, Vec2};
 use aeroflow_panel_method::{BodySpec, CirculationMode, PanelDiagnostics, PanelSystem};
@@ -64,6 +64,23 @@ pub struct BodyResult {
     pub notes: Vec<String>,
 }
 
+/// Force on one elementary singularity (Lagally theorem): the force needed to
+/// hold it fixed in the flow. See `aeroflow_flow_core::lagally`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ElementResult {
+    pub id: String,
+    pub name: String,
+    pub position: Vec2,
+    /// Force per unit span [N/m].
+    pub force: Vec2,
+    /// Wind-axis components of `force` [N/m].
+    pub lift: f64,
+    pub drag: f64,
+    /// Velocity induced at the element by everything else [m/s].
+    pub external_velocity: Vec2,
+}
+
 #[derive(Debug, Clone, Copy, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Timings {
@@ -105,6 +122,8 @@ pub const ASSUMPTIONS: &[&str] = &[
 pub struct Solution {
     pub status: SolveStatus,
     pub bodies: Vec<BodyResult>,
+    /// Lagally forces on the visible elementary singularities.
+    pub elements: Vec<ElementResult>,
     pub total: TotalForces,
     pub diagnostics: Diagnostics,
     pub warnings: Vec<Warning>,
@@ -117,6 +136,7 @@ impl Solution {
         Self {
             status: SolveStatus::Error,
             bodies: Vec::new(),
+            elements: Vec::new(),
             total: TotalForces::default(),
             diagnostics: Diagnostics {
                 panel: None,
@@ -321,6 +341,28 @@ pub(crate) fn solve_scene(
         });
     }
     let total = total_forces(&bodies.iter().map(|b| b.forces).collect::<Vec<_>>());
+
+    // Lagally forces on elements. `field.elements` holds the visible elements
+    // in scene order, so zip them back to their ids.
+    let elements: Vec<ElementResult> = scene
+        .elements
+        .iter()
+        .filter(|e| e.visible)
+        .enumerate()
+        .filter_map(|(i, e)| {
+            let f = element_force(&field, i, scene.conditions.density)?;
+            let (lift, drag) = scene.conditions.to_wind_axes(f.force);
+            Some(ElementResult {
+                id: e.id.clone(),
+                name: e.name.clone(),
+                position: e.element.position()?,
+                force: f.force,
+                lift,
+                drag,
+                external_velocity: f.external_velocity,
+            })
+        })
+        .collect();
     timings.forces_ms = now() - t_forces;
 
     // 5. Warnings.
@@ -352,6 +394,7 @@ pub(crate) fn solve_scene(
     };
     let solution = Solution {
         status,
+        elements,
         total,
         diagnostics: Diagnostics {
             panel: panel_diag,

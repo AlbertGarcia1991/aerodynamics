@@ -708,3 +708,59 @@ Cusped trailing edges converge at first order with source panels (Joukowski −4
 400 panels; NACA unaffected). XFOIL comparison figures are published values, not runs
 of XFOIL in this environment. Visual baselines are machine-specific. Chromium only.
 Geometry editor and PDF export remain out of MVP scope per the PRD.
+
+---
+
+## Post-MVP change request — 2026-10-03
+
+1. **Resizable panels.** Left, right and bottom panels resize by dragging their inner
+   edge (`components/ResizeHandle.tsx`). Sizes live in the UI store, persist to
+   `localStorage`, and are clamped (left 180–520 px, right 260–640 px, bottom 140 px
+   to 70 % of the window) so the canvas can't be squeezed away. Handles are WAI-ARIA
+   window splitters: arrow keys resize (Shift ×4), Home or double-click resets. Side
+   handles hide in compact mode, where those panels are overlays.
+2. **Distorted surface plot.** The chart drew into a fixed 640×300 viewBox stretched
+   with `preserveAspectRatio="none"`, so in a wide, short panel text and lines were
+   stretched ~2.7× horizontally. It now measures its container (`ResizeObserver`) and
+   draws at real pixel size; tick density follows the available space.
+3. **Cut-off Cp / V/U∞ / Δp buttons.** The side column is a vertical flex box in a
+   fixed-height panel, so children shrank; the segmented control (which clips its
+   overflow) collapsed to a few pixels. Children no longer shrink; the column scrolls.
+
+`e2e/resize.spec.ts` covers all three (drag, persistence, clamping, reset, keyboard;
+viewBox equals the rendered size; button heights). Visual baselines regenerated.
+`scripts/verify.sh` green: Rust 281 · Vitest 50 · Playwright 36 + 3.
+
+**Investigated, not changed:** the reported Cp ≈ −46 on a NACA 2023 is correct for the
+inviscid model at a large effective angle (≈ 50–60°, via α or body rotation): a default
+NACA 2023 gives Cp_min = −1.0 at 0° and −1.8 at 5°. The app does not yet warn that
+potential flow has no stall at such angles.
+
+---
+
+## Post-MVP change request — forces on elementary solutions — 2026-10-03
+
+**Question asked:** does the app show forces on elementary solutions, as vectors? It
+did not: forces came only from pressure integration over bodies, and nothing drew
+force arrows. All three proposed additions were implemented.
+
+1. **Body force arrows.** Resultant at the moment reference point with dashed lift and
+   drag components; one shared px-per-N/m scale for every arrow, with a key. Toggle
+   *Forces* in the canvas toolbar or press `O`. Arrows follow a dragged body a frame
+   ahead of the solve (re-posed like the contour).
+2. **Lagally forces on elements** (`crates/flow-core/src/lagally.rs`): vortex
+   `F = ρΓ(V_y, −V_x)`, source `F = −ρΛV`, doublet `F = ρκ(ê·∇)V` (derived from the
+   source–sink limit), with `V` the velocity induced by everything else. Exposed as
+   `Solution.elements`, shown in the Properties panel (with the "force needed to hold
+   it fixed" caveat and a new `elementForces` help topic), the Data tab and the forces
+   CSV.
+3. **Validation.** Unit tests against closed forms and Newton's third law; against
+   the exact circle-theorem force for a source and a vortex near a cylinder (both
+   sides within 0.6 %, bracketing the exact value); and the momentum balance against
+   pressure-integrated body forces. Results and the first-order convergence of that
+   balance are recorded in `tests/numerical/TOLERANCES.md`.
+
+Two test-construction issues surfaced along the way: a "distant" sink 10⁶ m away still
+induced a measurable force, and a source–sink pair at ε = 10⁻⁵ buried a 0.25 N/m result
+under ~10¹³ N/m of cancelling mutual forces. Both reference computations were rebuilt
+rather than loosened.

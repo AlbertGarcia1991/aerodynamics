@@ -27,6 +27,7 @@ pub mod descriptor;
 pub mod elements;
 pub mod field;
 pub mod forces;
+pub mod lagally;
 pub mod panel_kernel;
 pub mod streamline;
 
@@ -44,6 +45,7 @@ pub use forces::{
     integrate_forces, surface_points, total_forces, BodyForces, ChordFrame, ReferenceValues,
     Surface, SurfacePoint, TotalForces,
 };
+pub use lagally::{element_force, element_forces, ElementForce};
 pub use panel_kernel::{PanelKernel, PanelPotentials};
 pub use streamline::{
     trace, trace_set, SeedStrategy, SeedingConfig, Streamline, StreamlineConfig, Termination,

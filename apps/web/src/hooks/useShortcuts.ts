@@ -29,6 +29,7 @@ export const SHORTCUTS: { keys: string; action: string }[] = [
   { keys: 'G', action: 'Toggle grid' },
   { keys: 'L', action: 'Toggle streamlines' },
   { keys: 'V', action: 'Toggle velocity vectors' },
+  { keys: 'O', action: 'Toggle force arrows' },
   { keys: '1 – 7', action: 'Velocity, no field, pressure, Cp, vorticity, potential, stream function' },
   { keys: 'Scroll / pinch', action: 'Zoom about the cursor' },
   { keys: 'Drag background', action: 'Pan' },
@@ -139,6 +140,10 @@ export function useShortcuts(): void {
         case 'v':
         case 'V':
           viz.updateVectors({ show: !viz.vectors.show });
+          break;
+        case 'o':
+        case 'O':
+          viz.toggle('showForces');
           break;
         case '?':
           ui.openDialog('shortcuts');
