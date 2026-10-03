@@ -1,0 +1,1 @@
+{"root":["./vite.config.ts","./playwright.config.ts","./e2e/a11y.spec.ts","./e2e/core.spec.ts","./e2e/dod.spec.ts","./e2e/helpers.ts","./e2e/perf.spec.ts","./e2e/prod-smoke.spec.ts","./e2e/visual.spec.ts"],"version":"5.9.3"}

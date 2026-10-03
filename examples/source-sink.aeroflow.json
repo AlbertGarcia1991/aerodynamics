@@ -1,0 +1,41 @@
+{
+  "version": 1,
+  "name": "Source and sink",
+  "conditions": {
+    "velocity": 1,
+    "angle": 0,
+    "density": 1.225,
+    "pressure": 101325
+  },
+  "elements": [
+    {
+      "id": "source-sink-element-1",
+      "name": "Source 01",
+      "visible": true,
+      "locked": false,
+      "element": {
+        "type": "source",
+        "position": {
+          "x": -1,
+          "y": 0
+        },
+        "strength": 2
+      }
+    },
+    {
+      "id": "source-sink-element-2",
+      "name": "Sink 01",
+      "visible": true,
+      "locked": false,
+      "element": {
+        "type": "sink",
+        "position": {
+          "x": 1,
+          "y": 0
+        },
+        "strength": 2
+      }
+    }
+  ],
+  "bodies": []
+}

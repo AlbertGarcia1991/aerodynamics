@@ -1,0 +1,16 @@
+[package]
+name = "aeroflow-panel-method"
+description = "Hess-Smith source/vortex panel method for 2D potential flow"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+aeroflow-geometry = { workspace = true }
+aeroflow-linalg = { workspace = true }
+aeroflow-flow-core = { workspace = true }
+serde = { workspace = true, optional = true }
+
+[features]
+default = ["serde"]
+serde = ["dep:serde", "aeroflow-geometry/serde", "aeroflow-flow-core/serde"]

@@ -1,0 +1,13 @@
+target/
+node_modules/
+dist/
+pkg/
+*.log
+.DS_Store
+apps/web/src/wasm/pkg/
+test-results/
+playwright-report/
+coverage/
+.vite/
+.playwright-mcp/
+apps/web/e2e/*-snapshots/*.actual.png

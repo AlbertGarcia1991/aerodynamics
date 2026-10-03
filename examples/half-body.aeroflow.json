@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "name": "Rankine half-body",
+  "conditions": {
+    "velocity": 1,
+    "angle": 0,
+    "density": 1.225,
+    "pressure": 101325
+  },
+  "elements": [
+    {
+      "id": "half-body-element-1",
+      "name": "Source 01",
+      "visible": true,
+      "locked": false,
+      "element": {
+        "type": "source",
+        "position": {
+          "x": 0,
+          "y": 0
+        },
+        "strength": 3
+      }
+    }
+  ],
+  "bodies": []
+}

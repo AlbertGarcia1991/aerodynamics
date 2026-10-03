@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "name": "Vortex and freestream",
+  "conditions": {
+    "velocity": 1,
+    "angle": 0,
+    "density": 1.225,
+    "pressure": 101325
+  },
+  "elements": [
+    {
+      "id": "vortex-element-1",
+      "name": "Vortex 01",
+      "visible": true,
+      "locked": false,
+      "element": {
+        "type": "vortex",
+        "position": {
+          "x": 0,
+          "y": 0
+        },
+        "circulation": -3
+      }
+    }
+  ],
+  "bodies": []
+}

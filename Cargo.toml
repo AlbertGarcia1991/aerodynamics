@@ -1,0 +1,31 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/geometry",
+    "crates/linear-algebra",
+    "crates/flow-core",
+    "crates/panel-method",
+    "crates/solver",
+    "crates/wasm-api",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+rust-version = "1.75"
+
+[workspace.dependencies]
+aeroflow-geometry = { path = "crates/geometry" }
+aeroflow-linalg = { path = "crates/linear-algebra" }
+aeroflow-flow-core = { path = "crates/flow-core" }
+aeroflow-panel-method = { path = "crates/panel-method" }
+aeroflow-solver = { path = "crates/solver" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+panic = "abort"

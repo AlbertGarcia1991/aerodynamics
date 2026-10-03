@@ -1,0 +1,8 @@
+[package]
+name = "aeroflow-linalg"
+description = "Dense linear algebra for the AeroFlow panel solver"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]

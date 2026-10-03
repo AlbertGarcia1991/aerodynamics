@@ -1,0 +1,39 @@
+{
+  "version": 1,
+  "name": "NACA 2412",
+  "conditions": {
+    "velocity": 10,
+    "angle": 0,
+    "density": 1.225,
+    "pressure": 101325
+  },
+  "elements": [],
+  "bodies": [
+    {
+      "id": "naca2412-body-1",
+      "name": "NACA 2412",
+      "visible": true,
+      "locked": false,
+      "geometry": {
+        "kind": "naca4",
+        "code": "2412",
+        "chord": 1
+      },
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "rotation": 0,
+      "scale": 1,
+      "circulation": {
+        "mode": "auto"
+      },
+      "panels": {
+        "count": 160,
+        "distribution": "auto"
+      },
+      "reference": {},
+      "sourceName": null
+    }
+  ]
+}

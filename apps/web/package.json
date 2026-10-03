@@ -1,0 +1,37 @@
+{
+  "name": "aeroflow-web",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "AeroFlow — interactive 2D potential-flow simulator (React + TypeScript front end for the Rust/WASM solver)",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview --port 4173",
+    "typecheck": "tsc -b --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:e2e": "playwright test",
+    "wasm": "wasm-pack build ../../crates/wasm-api --target web --release --out-dir ../../apps/web/src/wasm/pkg --out-name aeroflow",
+    "examples": "vite-node scripts/export-examples.ts"
+  },
+  "dependencies": {
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "zustand": "^5.0.5"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "^4.13.0",
+    "@playwright/test": "^1.52.0",
+    "@testing-library/jest-dom": "^6.6.3",
+    "@testing-library/react": "^16.3.0",
+    "@types/node": "^22.15.0",
+    "@types/react": "^19.1.0",
+    "@types/react-dom": "^19.1.0",
+    "@vitejs/plugin-react": "^4.5.0",
+    "jsdom": "^26.1.0",
+    "typescript": "^5.8.3",
+    "vite": "^6.3.5",
+    "vitest": "^3.1.4"
+  }
+}

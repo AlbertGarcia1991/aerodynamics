@@ -1,0 +1,39 @@
+{
+  "version": 1,
+  "name": "Spinning cylinder",
+  "conditions": {
+    "velocity": 1,
+    "angle": 0,
+    "density": 1.225,
+    "pressure": 101325
+  },
+  "elements": [],
+  "bodies": [
+    {
+      "id": "magnus-body-1",
+      "name": "Spinning cylinder",
+      "visible": true,
+      "locked": false,
+      "geometry": {
+        "kind": "circle",
+        "radius": 1
+      },
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "rotation": 0,
+      "scale": 1,
+      "circulation": {
+        "mode": "prescribed",
+        "circulation": -4
+      },
+      "panels": {
+        "count": 160,
+        "distribution": "auto"
+      },
+      "reference": {},
+      "sourceName": null
+    }
+  ]
+}

@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "name": "Doublet cylinder",
+  "conditions": {
+    "velocity": 1,
+    "angle": 0,
+    "density": 1.225,
+    "pressure": 101325
+  },
+  "elements": [
+    {
+      "id": "doublet-element-1",
+      "name": "Doublet 01",
+      "visible": true,
+      "locked": false,
+      "element": {
+        "type": "doublet",
+        "position": {
+          "x": 0,
+          "y": 0
+        },
+        "strength": 6.283185307179586,
+        "orientation": 0
+      }
+    }
+  ],
+  "bodies": []
+}
