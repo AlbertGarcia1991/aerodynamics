@@ -20,6 +20,8 @@ test.describe('visual baselines', () => {
   test('empty state', async ({ page }) => {
     await openApp(page);
     await loadExample(page, 'Uniform flow');
+    // Particles animate continuously; freeze them like every other baseline.
+    await stillFrame(page);
     await expect(page).toHaveScreenshot('empty-state.png', shot);
   });
 

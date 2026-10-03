@@ -764,3 +764,29 @@ Two test-construction issues surfaced along the way: a "distant" sink 10⁶ m aw
 induced a measurable force, and a source–sink pair at ε = 10⁻⁵ buried a 0.25 N/m result
 under ~10¹³ N/m of cancelling mutual forces. Both reference computations were rebuilt
 rather than loosened.
+
+---
+
+## Post-MVP fix — drag polar always vertical — 2026-10-03
+
+**Report:** the CL–CD plot was a vertical line except for body-circulation sweeps.
+
+* **Physics, correct:** inviscid CD of a closed body is ~0 (d'Alembert); NACA 0012 over
+  ±10° gives CD = 1.8–3.4×10⁻⁴, pure discretisation error.
+* **Chart bug, fixed:** `LineChart` forced every x-axis to include [0, 1] (right only
+  for x/c), collapsing CD onto x = 0. X now auto-ranges to the data; the polar sets a
+  minimum span of 0.02 so a residual near zero still *reads* as zero instead of being
+  magnified into a fake drag bucket, with a note stating why. Tick generation now uses
+  integer multiples of the step, so zero no longer prints as `3.5e-18`.
+* **Circulation sweeps, now flagged:** prescribing Γ on a sharp trailing edge overrides
+  the Kutta condition; any Γ other than the Kutta value makes the trailing-edge flow
+  singular, which the panel method turns into spurious pressures — CD reached
+  −1.5×10⁻² (fake thrust) at Γ = −5. New solver warning
+  `prescribedCirculationViolatesKutta`, triggered by the measured trailing-edge
+  velocity mismatch (> 0.05 U∞), so prescribing the Kutta value itself is not flagged
+  and smooth bodies (the Magnus example) never are. The Polar tab shows the same
+  caveat when a circulation sweep targets an airfoil.
+* Also fixed: the `empty state` visual baseline left particles animating and passed
+  only by chance; it now freezes them like the others (stable over three runs).
+
+`scripts/verify.sh` green: Rust 295 · Vitest 50 · Playwright 41 + 3.

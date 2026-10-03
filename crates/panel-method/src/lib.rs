@@ -64,6 +64,10 @@ fn positive_finite(x: f64) -> bool {
 /// warning is raised — the usual panel-method guidance is to keep it below 2–3.
 pub const MAX_ADJACENT_LENGTH_RATIO: f64 = 4.0;
 
+/// Mismatch `|V_t,0 + V_t,N−1| / U` above which a prescribed circulation on a
+/// sharp trailing edge is reported as violating the Kutta condition.
+pub const KUTTA_RESIDUAL_TOLERANCE: f64 = 0.05;
+
 /// How a body's circulation is determined (PRD §12.1 "optional
 /// circulation/Kutta condition").
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -162,6 +166,9 @@ pub enum WarningCode {
     NonUniformPanels,
     NetOutflowNonZero,
     KuttaWithoutSharpEdge,
+    /// A prescribed circulation on a body with a sharp trailing edge that
+    /// differs from the Kutta value: the trailing-edge flow is singular.
+    PrescribedCirculationViolatesKutta,
     BodiesOverlap,
 }
 
@@ -230,6 +237,9 @@ struct BodyLayout {
     /// Known `γ` for fixed-circulation bodies (0 otherwise).
     gamma_fixed: f64,
     perimeter: f64,
+    /// Prescribed circulation on a contour that starts at a sharp trailing
+    /// edge — the case where the Kutta residual must be checked after solving.
+    prescribed_on_sharp_edge: bool,
 }
 
 /// The assembled and factorised panel system for a fixed geometry.
@@ -290,6 +300,10 @@ impl PanelSystem {
                     (None, None, circulation / perimeter)
                 }
             };
+            let prescribed_on_sharp_edge =
+                matches!(body.circulation, CirculationMode::Prescribed { .. })
+                    && aeroflow_geometry::trailing_edge::turn_angle_at(&body.polygon, 0)
+                        >= aeroflow_geometry::SHARP_CORNER_THRESHOLD;
             layouts.push(BodyLayout {
                 start,
                 end,
@@ -297,6 +311,7 @@ impl PanelSystem {
                 kutta_row,
                 gamma_fixed,
                 perimeter,
+                prescribed_on_sharp_edge,
             });
         }
         let n = panels.len();
@@ -617,6 +632,30 @@ impl PanelSystem {
             }
         }
 
+        // Prescribed Γ on a sharp trailing edge: measure how far the solution is
+        // from the Kutta condition. Any Γ other than the Kutta value makes the
+        // flow turn the edge at unbounded speed; the panel method smears that
+        // singularity into large spurious pressures, which corrupt CD and Cm
+        // (lift still follows −ρU∞Γ). Prescribing the Kutta value itself — Γ = 0
+        // on a symmetric section at α = 0, say — is fine and is not flagged.
+        for (b, l) in self.layouts.iter().enumerate() {
+            if !l.prescribed_on_sharp_edge || u_ref <= 0.0 {
+                continue;
+            }
+            let residual = (tangential[l.start] + tangential[l.end - 1]).abs() / u_ref;
+            if residual > KUTTA_RESIDUAL_TOLERANCE {
+                warnings.push(PanelWarning {
+                    code: WarningCode::PrescribedCirculationViolatesKutta,
+                    message: format!(
+                        "Body {} has a sharp trailing edge but a prescribed circulation that violates the Kutta condition (trailing-edge velocity mismatch {:.2}·U∞). The flow turns the edge at unbounded speed: lift still follows L = −ρU∞Γ, but Cp near the trailing edge, CD and Cm are not reliable. Use the Kutta mode for physical airfoil results.",
+                        b + 1,
+                        residual
+                    ),
+                    body: Some(b),
+                });
+            }
+        }
+
         Ok(PanelSolution {
             bodies,
             diagnostics: PanelDiagnostics {
@@ -696,6 +735,48 @@ mod tests {
             PanelSystem::assemble(&[b]),
             Err(PanelError::ZeroLengthPanel { body: 0, panel: 5 })
         ));
+    }
+
+    #[test]
+    fn prescribed_circulation_on_a_sharp_edge_is_flagged_unless_it_is_the_kutta_value() {
+        let naca = || shapes::Naca4::default().generate(120);
+        let amb = stream(1.0, 5.0_f64.to_radians());
+        let kutta = solve(&[body(naca(), CirculationMode::Kutta)], &amb).unwrap();
+        let gamma_kutta = kutta.bodies[0].circulation;
+        let flagged = |gamma: f64| {
+            solve(
+                &[body(
+                    naca(),
+                    CirculationMode::Prescribed { circulation: gamma },
+                )],
+                &amb,
+            )
+            .unwrap()
+            .diagnostics
+            .warnings
+            .iter()
+            .any(|w| w.code == WarningCode::PrescribedCirculationViolatesKutta && w.body == Some(0))
+        };
+        assert!(flagged(0.0), "Γ = 0 at α = 5° violates Kutta");
+        assert!(flagged(gamma_kutta * 2.0));
+        assert!(
+            !flagged(gamma_kutta),
+            "prescribing the Kutta value itself is fine"
+        );
+        // A smooth body has no Kutta condition to violate (the Magnus example).
+        let cyl = solve(
+            &[body(
+                shapes::circle(1.0, 64),
+                CirculationMode::Prescribed { circulation: -4.0 },
+            )],
+            &amb,
+        )
+        .unwrap();
+        assert!(!cyl
+            .diagnostics
+            .warnings
+            .iter()
+            .any(|w| w.code == WarningCode::PrescribedCirculationViolatesKutta));
     }
 
     #[test]

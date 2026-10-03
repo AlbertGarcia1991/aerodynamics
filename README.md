@@ -104,9 +104,9 @@ SKIP_E2E=1 scripts/verify.sh # without the browser suites
 
 | Suite | Count | Covers |
 | --- | --- | --- |
-| Rust | 294 | analytical acceptance, solver/geometry units, TS↔Rust scene contract on every example |
+| Rust | 295 | analytical acceptance, solver/geometry units, TS↔Rust scene contract on every example |
 | Vitest | 50 | domain helpers, viewport math, colour maps, worker client coalescing, CSV, example fixtures, module boundaries |
-| Playwright | 39 + 3 | PRD core flows, visual baselines, axe WCAG 2.2 AA scans, keyboard-only use, responsive layouts, performance, production-build smoke |
+| Playwright | 41 + 3 | PRD core flows, visual baselines, axe WCAG 2.2 AA scans, keyboard-only use, responsive layouts, performance, production-build smoke |
 
 Visual baselines live in `apps/web/e2e/visual.spec.ts-snapshots/`; after an intended
 visual change regenerate with `npx playwright test e2e/visual.spec.ts --update-snapshots=all`.

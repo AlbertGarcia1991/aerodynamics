@@ -52,6 +52,11 @@ export interface LineChartProps {
   symmetricY?: boolean;
   xDomain?: [number, number];
   yDomain?: [number, number];
+  /**
+   * Smallest x-span to show, centred on the data. Keeps a quantity that is
+   * meant to be ≈ 0 (inviscid CD) from being magnified into apparent structure.
+   */
+  minSpanX?: number;
   height?: number;
   formatX?: (v: number) => string;
   formatY?: (v: number) => string;
@@ -67,7 +72,12 @@ function niceTicks(min: number, max: number, count = 5): number[] {
   const m = raw / pow;
   const step = (m < 1.5 ? 1 : m < 3 ? 2 : m < 7 ? 5 : 10) * pow;
   const out: number[] = [];
-  for (let v = Math.ceil(min / step) * step; v <= max + 1e-9 * step; v += step) out.push(parseFloat(v.toPrecision(10)));
+  // Generate ticks as integer multiples of the step (no accumulated round-off),
+  // and snap the one at zero exactly so it never prints as 3.5e-18.
+  for (let k = Math.ceil(min / step); k * step <= max + 1e-9 * step; k++) {
+    const v = k * step;
+    out.push(k === 0 ? 0 : parseFloat(v.toPrecision(10)));
+  }
   return out;
 }
 
@@ -82,6 +92,7 @@ export function LineChart({
   symmetricY = false,
   xDomain,
   yDomain,
+  minSpanX = 0,
   formatX = defaultFmt,
   formatY = defaultFmt,
   referenceY = [],
@@ -112,8 +123,26 @@ export function LineChart({
 
   const { xs, ys } = useMemo(() => {
     const pts = series.flatMap((s) => s.points).filter((p) => Number.isFinite(p.x) && Number.isFinite(p.y));
-    const xmin = xDomain?.[0] ?? Math.min(...pts.map((p) => p.x), 0);
-    const xmax = xDomain?.[1] ?? Math.max(...pts.map((p) => p.x), 1);
+    // Auto-range x to the data. (Forcing [0, 1] in — right only for x/c —
+    // collapsed small-valued axes such as CD onto a vertical line at 0.)
+    let xmin = xDomain?.[0] ?? Math.min(...pts.map((p) => p.x));
+    let xmax = xDomain?.[1] ?? Math.max(...pts.map((p) => p.x));
+    if (!Number.isFinite(xmin) || !Number.isFinite(xmax)) {
+      xmin = 0;
+      xmax = 1;
+    }
+    if (!xDomain) {
+      const span = Math.max(xmax - xmin, minSpanX, 1e-12);
+      const mid = (xmin + xmax) / 2;
+      if (xmax - xmin < span) {
+        xmin = mid - span / 2;
+        xmax = mid + span / 2;
+      }
+      if (xmax - xmin <= 1e-12) {
+        xmin -= 1;
+        xmax += 1;
+      }
+    }
     let ymin = yDomain?.[0] ?? Math.min(...pts.map((p) => p.y));
     let ymax = yDomain?.[1] ?? Math.max(...pts.map((p) => p.y));
     if (!Number.isFinite(ymin) || !Number.isFinite(ymax)) {

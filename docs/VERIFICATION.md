@@ -1,7 +1,7 @@
 # Verification report — PRD §79 Definition of Done
 
 Every MVP criterion mapped to the test that demonstrates it. All suites green on
-2026-10-03 via `scripts/verify.sh`: **Rust 294 · Vitest 50 · Playwright 39 (dev) + 3
+2026-10-03 via `scripts/verify.sh`: **Rust 295 · Vitest 50 · Playwright 41 (dev) + 3
 (production build)**.
 
 Abbreviations: `core` = `apps/web/e2e/core.spec.ts`, `dod` = `e2e/dod.spec.ts`,
@@ -37,7 +37,7 @@ Abbreviations: `core` = `apps/web/e2e/core.spec.ts`, `dod` = `e2e/dod.spec.ts`,
 | 24 | Reload a simulation | core (as above); examples (every fixture deserialises in Rust) |
 | 25 | Export numerical data | core *exports force results as CSV*; Vitest `csv.test.ts` (forces, surface, field, geometry, sweep) |
 | 26 | Pass all analytical numerical regression tests | analytical (22) + flow-core/panel-method units; measured tolerances in `tests/numerical/TOLERANCES.md` |
-| 27 | Pass the core E2E suite | `npx playwright test` — 39/39 |
+| 27 | Pass the core E2E suite | `npx playwright test` — 41/41 |
 | 28 | Run numerical computation through WASM | prod (worker + `.wasm` from the production bundle); Vitest *only the solver worker loads the WASM module* |
 | 29 | Remain responsive while solving | perf *main-thread frames stay smooth while a 1000-panel cold solve runs* (p95 16.7 ms); core *stays responsive while solving a large body* |
 

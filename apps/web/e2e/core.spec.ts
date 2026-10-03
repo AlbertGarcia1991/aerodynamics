@@ -240,3 +240,37 @@ test.describe('core flows (PRD §63)', () => {
     await expect(page.getByRole('banner')).toContainText(/Solved/, { timeout: 30_000 });
   });
 });
+
+test.describe('polar chart (CD ≈ 0 must read as ≈ 0)', () => {
+  test('the drag polar x-axis is ranged around the data, not forced to [0, 1]', async ({ page }) => {
+    await openApp(page);
+    await loadExample(page, 'NACA 0012');
+    await page.getByRole('tab', { name: 'Polar' }).click();
+    await page.getByLabel('Sweep points').fill('9');
+    await page.getByRole('button', { name: 'Run sweep' }).click();
+    const polar = page.locator('svg[aria-label="CL versus CD (inviscid residual)"]');
+    await expect(polar).toBeVisible({ timeout: 30_000 });
+    // x tick labels sit on the bottom axis row; all must lie within ±0.02.
+    const ticks = await polar.evaluate((svg) => {
+      const h = svg.getBoundingClientRect().height;
+      return Array.from(svg.querySelectorAll('g.axis text'))
+        .filter((t) => Number(t.getAttribute('y')) > h - 30 && Number(t.getAttribute('y')) < h - 10)
+        .map((t) => Number(t.textContent));
+    });
+    expect(ticks.length).toBeGreaterThan(2);
+    for (const t of ticks) expect(Math.abs(t)).toBeLessThanOrEqual(0.02);
+    await expect(page.getByText(/CD ≈ 0 is the correct inviscid result/)).toBeVisible();
+  });
+
+  test('a circulation sweep on an airfoil warns that the Kutta condition is overridden', async ({ page }) => {
+    await openApp(page);
+    await loadExample(page, 'NACA 0012');
+    await page.getByRole('tab', { name: 'Polar' }).click();
+    await page.getByLabel('Sweep parameter').selectOption('bodyCirculation');
+    await expect(page.getByText(/Prescribing Γ overrides the Kutta condition/)).toBeVisible();
+    // A cylinder has no sharp edge: no warning.
+    await loadExample(page, 'Flow around a cylinder');
+    await page.getByLabel('Sweep parameter').selectOption('bodyCirculation');
+    await expect(page.getByText(/Prescribing Γ overrides the Kutta condition/)).toBeHidden();
+  });
+});

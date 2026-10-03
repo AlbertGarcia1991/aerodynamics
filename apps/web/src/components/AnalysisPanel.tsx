@@ -198,7 +198,7 @@ function PolarTab() {
         )}
         <p className="form__hint" style={{ margin: 0 }}>
           {kind === 'bodyCirculation'
-            ? `Prescribes Γ on “${focus?.name ?? '—'}” at each point: lift should follow L = −ρU∞Γ exactly.`
+            ? `Prescribes Γ on “${focus?.name ?? '—'}” at each point: lift should follow L = −ρU∞Γ.`
             : `Results for “${focus?.name ?? '—'}”.`}
         </p>
         <label className="field field--inline"><span className="field__label">From</span><span className="field__input"><input type="number" value={start} onChange={(e) => setStart(Number(e.target.value))} aria-label="Sweep start" /><span className="field__unit">{meta.unit}</span></span></label>
@@ -215,6 +215,14 @@ function PolarTab() {
           </button>
         )}
         {needsElement && <p className="form__hint">Add a flow element to sweep its strength.</p>}
+        {kind === 'bodyCirculation' && focus?.kuttaApplicable && (
+          <div className="callout callout--warning">
+            <IconWarning size={14} />
+            <span>
+              “{focus.name}” has a sharp trailing edge. Prescribing Γ overrides the Kutta condition, so except at the Kutta value the flow turns the edge at unbounded speed: lift still follows L = −ρU∞Γ, but CD and Cm are not reliable.
+            </span>
+          </div>
+        )}
         {sweep.result && !sweep.result.completed && <p className="form__hint" role="status">Cancelled after {sweep.result.points.length} points.</p>}
         {sweep.error && <div className="callout callout--danger"><IconWarning size={14} /><span>{sweep.error}</span></div>}
         {sweep.points.length > 0 && (
@@ -235,12 +243,16 @@ function PolarTab() {
           )}
           <div className="chart"><LineChart exportName="Cm_sweep.svg" series={[mk('cm', 'Cm', 'cm')]} xLabel={ranMeta.axis} yLabel="Cm" referenceY={[0]} /></div>
           <div className="chart">
+            <div className="chart__legend" style={{ paddingTop: 6 }}>
+              CD ≈ 0 is the correct inviscid result (d&apos;Alembert); the spread is discretisation error.
+            </div>
             <LineChart
               exportName="drag_polar.svg"
               series={[{ id: 'polar', label: 'CL', color: LOWER, markers: true, points: pts.map((p) => ({ x: p.cd, y: p.cl })) }]}
               xLabel="CD (inviscid residual)"
               yLabel="CL"
               referenceY={[0]}
+              minSpanX={0.02}
             />
           </div>
         </div>
