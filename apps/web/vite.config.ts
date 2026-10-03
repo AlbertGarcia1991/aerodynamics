@@ -21,4 +21,5 @@ export default defineConfig({
     include: ['src/**/*.test.{ts,tsx}'],
     exclude: ['e2e/**', 'node_modules/**'],
   },
+  base: process.env.GITHUB_ACTIONS ? '/aerodynamics/' : '/',
 });
