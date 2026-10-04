@@ -1,4 +1,4 @@
-# AeroFlow — 2D Potential Flow Simulator
+-# AeroFlow — 2D Potential Flow Simulator
 
 An interactive browser application for building, solving and visualising 2D
 incompressible potential flows. Drop in sources, sinks, vortices, doublets and
@@ -33,7 +33,7 @@ static host — the worker and `.wasm` are emitted as hashed assets).
 | | |
 | --- | --- |
 | **Elements** | uniform flow, source, sink, vortex, doublet — analytic, superposed |
-| **Bodies** | NACA 4-digit, cylinder, ellipse, Joukowski, or imported coordinates (`.csv`, Selig/Lednicer `.dat`, `.txt`) |
+| **Bodies** | NACA 4-digit, cylinder, ellipse, Joukowski, imported coordinates (`.csv`, Selig/Lednicer `.dat`, `.txt`), or **editable Bézier shapes** (see below) |
 | **Solver** | Hess–Smith constant-strength source panels + one vortex strength per body; Kutta condition at sharp trailing edges (auto-detected), zero or prescribed circulation otherwise; all bodies coupled in one global system |
 | **Fields** | velocity magnitude / u / v, pressure, Cp, vorticity, potential φ, stream function ψ — WebGL2, perceptual colour maps, contour bands, isolines |
 | **Overlays** | evenly spaced streamlines (Jobard–Lefer) with animated particles, velocity vectors, manual seeds, hover probe |
@@ -44,6 +44,66 @@ static host — the worker and `.wasm` are emitted as hashed assets).
 | **UX** | resizable side and bottom panels (drag an edge; double-click resets; sizes remembered), undo/redo, keyboard shortcuts (press `?`), contextual help, light/dark/system themes, compact layout for tablet and phone |
 
 Try the shipped coordinate file `examples/naca2412-selig.dat` via **Add → Import coordinates**.
+
+### Editable Bézier bodies — user guide
+
+Draw or reshape a body and watch the flow, pressure and forces recompute as you move it.
+The curve you edit is made of **cubic Bézier segments** joined at **nodes**; each node has an *incoming* and an *outgoing* **handle** that set the tangent direction and how tightly the curve bends.
+
+#### 1. Create a body
+
+**Add → Create geometry → Editable (Bézier)**, pick a template (NACA 2412 or 0012 airfoil, circle, ellipse, flat plate, rounded plate, rounded rectangle) or **Blank** to draw your own with the pen, then **Create**. Templates open straight into the Node tool.
+
+![Create geometry dialog with the Bézier template picker](docs/images/bezier-1-create.png)
+
+#### 2. Edit nodes and handles — Node tool (`N`)
+
+| Do this | To get this |
+| --- | --- |
+| Click a node | Select it; its handles appear and the **Node** form opens in the properties panel |
+| Drag a node or a handle | Move it. The panels are regenerated and the flow re-solved while you drag |
+| Shift-click, or drag a box on the background | Select several nodes (they move together) |
+| Click the curve | Insert a node there. The curve does not change (exact subdivision) |
+| Double-click a node | Toggle sharp **corner** ↔ **smooth** |
+| Arrow keys (Shift ×10, Alt ×0.1) | Nudge the selected nodes |
+| `Delete` | Remove selected nodes (a closed shape keeps at least 3) |
+
+Node types: **Smooth** keeps both handles on one line (continuous tangent, e.g. a rounded leading edge). **Corner** lets the handles point anywhere (a sharp trailing edge — this is what the solver uses for the Kutta condition). **Symmetric** keeps the handles opposite and equal.
+The node form also takes exact numbers for position and both handles, which is the precise (and keyboard-only) way to edit.
+
+![A selected node with its handles and the Node form](docs/images/bezier-2-select-node.png)
+
+Drag the upper-surface node upward and the camber changes: the Cp plot, lift and streamlines follow. `Ctrl/⌘ + Z` undoes the whole drag in one step.
+
+![After dragging the node up: Cp distribution and forces have changed](docs/images/bezier-3-drag.png)
+
+#### 3. Draw a new shape — Pen tool (`P`)
+
+Click for a corner node, **click-and-drag** for a smooth node (the drag sets the handle), and click the **first node** to close the path. With nothing selected the pen starts a new body. An *open* path is drawn dashed and is not solved until it is closed (or tick **Closed path** in the properties panel).
+
+![Pen tool: an open path with a click-dragged smooth node](docs/images/bezier-5-pen.png)
+
+![The same path closed, solved and plotted](docs/images/bezier-6-closed.png)
+
+#### 4. See the panels
+
+**Panels** (`K`) draws the panel mesh the solver actually uses: vertices, outward normals, and indices on coarse meshes. Change **Panels → Panel count / Distribution** in the properties panel to refine it.
+
+![Panel mesh overlay](docs/images/bezier-4-panels.png)
+
+#### 5. Other operations
+
+- **Mirror ↔ / ↕** flips the shape in place; **Closed path** opens or closes it.
+- Move, rotate, scale, duplicate (`Ctrl/⌘ + D`), hide and lock work as for any body; a locked body still takes part in the simulation but its nodes cannot be edited.
+- **Add → Import coordinates → Convert to editable Bézier curves** fits an imported contour within a tolerance you choose (percent of the shape's size). Sharp corners stay sharp, and the result is labelled as an approximation with its largest deviation.
+- **File → Save** keeps every control point (scenes with Bézier bodies are written as format v2; all other scenes stay v1). **Export → Bézier outline** writes the sampled curve as CSV.
+
+#### How it works, and what to expect
+
+- The Bézier curve is the source of truth. Just before each solve it is sampled to a contour, which the Rust solver re-panels; the solver never sees Bézier data.
+- While you drag, the solve uses 64 panels for responsiveness; once you pause it is re-solved at the configured panel count. Every result is tagged with the geometry revision it was computed for, and a result that trails the geometry is marked *Updating flow…* at the bottom of the canvas.
+- A shape that is open, has fewer than 3 nodes, or **crosses itself** is flagged (crossings are marked with a red ✕) and left out of the solve, rather than solved as something you did not draw.
+- This is inviscid potential flow: a very thin or sharply kinked shape gives sharp, local Cp peaks that are real features of the model, not errors.
 
 ## Model and its limits
 
