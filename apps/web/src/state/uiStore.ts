@@ -3,7 +3,8 @@ import { create } from 'zustand';
 import type { ElementKind } from '@/domain/types';
 
 export type Theme = 'light' | 'dark' | 'system';
-export type Tool = 'select' | 'pan' | 'seed';
+/** `node` edits Bézier nodes/handles, `pen` draws new ones (PRD2 §17). */
+export type Tool = 'select' | 'pan' | 'seed' | 'node' | 'pen';
 export type BottomTab = 'surface' | 'polar' | 'diagnostics' | 'data';
 export type DialogKind = 'welcome' | 'examples' | 'import' | 'geometry' | 'about' | 'shortcuts' | 'export' | 'sweep';
 
@@ -28,6 +29,8 @@ export interface UIStore {
   setPanelSize(panel: ResizablePanel, px: number): void;
   resetPanelSize(panel: ResizablePanel): void;
   selectedIds: string[];
+  /** Selected Bézier nodes of the (single) selected body. */
+  selectedNodeIds: string[];
   hoverId: string | null;
   tool: Tool;
   /** Element kind to place at the next canvas click. */
@@ -44,6 +47,7 @@ export interface UIStore {
   compact: boolean;
 
   select(ids: string[], additive?: boolean): void;
+  selectNodes(ids: string[], additive?: boolean): void;
   toggleSelect(id: string): void;
   clearSelection(): void;
   setHover(id: string | null): void;
@@ -119,6 +123,7 @@ export const useUIStore = create<UIStore>((set, get) => ({
     set({ panelSizes: sizes });
   },
   selectedIds: [],
+  selectedNodeIds: [],
   hoverId: null,
   tool: 'select',
   pendingAdd: null,
@@ -133,7 +138,10 @@ export const useUIStore = create<UIStore>((set, get) => ({
   compact: false,
 
   select(ids, additive = false) {
-    set((s) => ({ selectedIds: additive ? Array.from(new Set([...s.selectedIds, ...ids])) : ids }));
+    set((s) => ({ selectedIds: additive ? Array.from(new Set([...s.selectedIds, ...ids])) : ids, selectedNodeIds: [] }));
+  },
+  selectNodes(ids, additive = false) {
+    set((s) => ({ selectedNodeIds: additive ? Array.from(new Set([...s.selectedNodeIds, ...ids])) : ids }));
   },
   toggleSelect(id) {
     set((s) => ({
@@ -141,7 +149,7 @@ export const useUIStore = create<UIStore>((set, get) => ({
     }));
   },
   clearSelection() {
-    set({ selectedIds: [] });
+    set({ selectedIds: [], selectedNodeIds: [] });
   },
   setHover(id) {
     if (get().hoverId !== id) set({ hoverId: id });

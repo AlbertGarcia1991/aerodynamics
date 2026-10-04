@@ -128,6 +128,8 @@ function bodySubtitle(b: SceneBody): string {
       return `${b.geometry.semiAxisX}×${b.geometry.semiAxisY} m · ${b.panels.count} panels`;
     case 'joukowski':
       return `Joukowski · ${b.panels.count} panels`;
+    case 'bezier':
+      return `Bézier · ${b.geometry.nodes.length} nodes${b.geometry.closed ? '' : ' · open'} · ${b.panels.count} panels`;
     case 'points':
       return `${b.geometry.points.length} points${b.panels.distribution === 'asImported' ? '' : ` → ${b.panels.count} panels`}`;
   }

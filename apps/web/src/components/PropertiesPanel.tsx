@@ -12,6 +12,7 @@ import { useSolverStore } from '@/state/solverStore';
 import type { BodyGeometry, BodyResult, CirculationSetting, PanelDistribution, SceneBody, SceneElement } from '@/domain/types';
 import { readParameter, toDegrees, toRadians, writeParameter } from '@/domain/scene';
 import { NumberField } from './NumberField';
+import { BezierFields } from './BezierFields';
 import { IconCopy, IconHelp, IconInfo, IconTrash, IconWarning } from './icons';
 
 /** Stable empty fallbacks: zustand selectors must not return a fresh array each call. */
@@ -201,6 +202,8 @@ function GeometryFields({ body, update }: { body: SceneBody; update: (fn: (b: Sc
           <p className="form__hint">Normalised to unit chord. A true cusped trailing edge: use ≥ 400 panels for accurate pressure-integrated lift.</p>
         </>
       );
+    case 'bezier':
+      return <BezierFields body={body} update={update} />;
     case 'points':
       return (
         <p className="form__hint">

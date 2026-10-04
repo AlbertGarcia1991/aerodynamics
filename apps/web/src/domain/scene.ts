@@ -4,6 +4,7 @@
  * tested without a browser.
  */
 import type {
+  BezierGeometry,
   BodyGeometry,
   Element,
   ElementKind,
@@ -14,7 +15,7 @@ import type {
   SceneObject,
   Vec2,
 } from './types';
-import { SCENE_FORMAT_VERSION } from './types';
+import { BASE_FORMAT_VERSION, SCENE_FORMAT_VERSION } from './types';
 
 export const DEG = Math.PI / 180;
 export const toDegrees = (rad: number): number => rad / DEG;
@@ -51,7 +52,7 @@ export const DEFAULT_CONDITIONS: FlowConditions = {
 
 export function createScene(name = 'Untitled simulation', conditions: Partial<FlowConditions> = {}): Scene {
   return {
-    version: SCENE_FORMAT_VERSION,
+    version: BASE_FORMAT_VERSION,
     name,
     conditions: { ...DEFAULT_CONDITIONS, ...conditions },
     elements: [],
@@ -117,7 +118,9 @@ export function createBody(scene: Scene, geometry: BodyGeometry, name?: string, 
           ? 'Ellipse'
           : geometry.kind === 'joukowski'
             ? 'Joukowski'
-            : 'Body');
+            : geometry.kind === 'bezier'
+              ? 'Custom body'
+              : 'Body');
   return {
     id: newId('body'),
     name: name ?? nextName(scene, base),
@@ -212,7 +215,7 @@ export function parseScene(text: string): Scene {
     throw new Error('The file has no flow conditions.');
   }
   return {
-    version: SCENE_FORMAT_VERSION,
+    version: obj.version,
     name: typeof obj.name === 'string' ? obj.name : 'Imported simulation',
     conditions: { ...DEFAULT_CONDITIONS, ...obj.conditions },
     elements: Array.isArray(obj.elements) ? obj.elements : [],
@@ -220,9 +223,32 @@ export function parseScene(text: string): Scene {
   };
 }
 
+const finiteVec = (v: unknown): Vec2 | null => {
+  const p = v as Partial<Vec2> | null | undefined;
+  return p && typeof p.x === 'number' && typeof p.y === 'number' && Number.isFinite(p.x) && Number.isFinite(p.y) ? { x: p.x, y: p.y } : null;
+};
+
+/** Untrusted file → well-formed Bézier geometry, or a readable error (never a crash later). */
+function normaliseBezier(g: BezierGeometry, body: string): BezierGeometry {
+  if (!Array.isArray(g.nodes)) throw new Error(`Body “${body}” has Bézier geometry but no node list.`);
+  const nodes = g.nodes.map((n, i) => {
+    const position = finiteVec(n?.position);
+    if (!position) throw new Error(`Body “${body}”: node ${i + 1} has no valid position.`);
+    return {
+      id: typeof n.id === 'string' && n.id ? n.id : newId('node'),
+      position,
+      inHandle: finiteVec(n.inHandle) ?? vec2(0, 0),
+      outHandle: finiteVec(n.outHandle) ?? vec2(0, 0),
+      nodeType: n.nodeType === 'smooth' || n.nodeType === 'symmetric' ? n.nodeType : ('corner' as const),
+    };
+  });
+  return { kind: 'bezier', closed: g.closed !== false, nodes, fitError: typeof g.fitError === 'number' ? g.fitError : null };
+}
+
 function normaliseBody(b: SceneBody): SceneBody {
   return {
     ...b,
+    geometry: b.geometry?.kind === 'bezier' ? normaliseBezier(b.geometry, b.name ?? 'Body') : b.geometry,
     visible: b.visible ?? true,
     locked: b.locked ?? false,
     position: b.position ?? vec2(0, 0),
@@ -234,8 +260,10 @@ function normaliseBody(b: SceneBody): SceneBody {
   };
 }
 
+/** Version follows content: only scenes that need Bézier support are written as v2. */
 export function serialiseScene(scene: Scene): string {
-  return JSON.stringify(scene, null, 2);
+  const version = scene.bodies.some((b) => b.geometry.kind === 'bezier') ? SCENE_FORMAT_VERSION : BASE_FORMAT_VERSION;
+  return JSON.stringify({ ...scene, version }, null, 2);
 }
 
 /** World-space bounding box of everything in the scene, for fit-to-view. */

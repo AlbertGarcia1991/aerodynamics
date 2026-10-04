@@ -10,6 +10,7 @@ import { createBody, serialiseScene } from '@/domain/scene';
 import { solverRef } from '@/App';
 import { downloadBlob, downloadText, safeFilename } from '@/export/download';
 import { fieldCsv, forcesCsv, geometryCsv, surfaceCsv } from '@/export/csv';
+import { bezierWorldPolygon, boundsOf, fitPoints, sampleBezier, templateGeometry, TEMPLATE_LABELS, type BezierTemplate } from '@/domain/bezier';
 import { SHORTCUTS } from '@/hooks/useShortcuts';
 import { fitToScene } from '@/canvas/fit';
 import { IconClose, IconDownload, IconInfo, IconWarning } from './icons';
@@ -169,6 +170,9 @@ function ImportDialog() {
   const [count, setCount] = useState(120);
   const [distribution, setDistribution] = useState<PanelDistribution>('auto');
   const [busy, setBusy] = useState(false);
+  const [asBezier, setAsBezier] = useState(false);
+  /** Fit tolerance as a percentage of the shape's largest dimension. */
+  const [tolPct, setTolPct] = useState(0.05);
 
   useEffect(() => {
     const client = solverRef.client;
@@ -198,13 +202,25 @@ function ImportDialog() {
       const name = r.name ?? fileName.replace(/\.[^.]+$/, '') ?? 'Imported body';
       const sim = useSimulationStore.getState();
       // Build the body fully before inserting it, so the import is one undo step.
-      const body = createBody(sim.scene, { kind: 'points', points: r.points }, name);
-      body.panels = { count: r.panelCount, distribution: 'asImported' };
+      let body;
+      let approximation = '';
+      if (asBezier) {
+        // Fit from the cleaned source contour, not the re-panelled one, so the error is measured against what the user supplied.
+        const source = validation?.points ?? r.points;
+        const bb = boundsOf(source);
+        const fit = fitPoints(source, (tolPct / 100) * Math.max(bb.max.x - bb.min.x, bb.max.y - bb.min.y));
+        body = createBody(sim.scene, fit.geometry, name);
+        body.panels = { count, distribution: 'auto' };
+        approximation = ` Imported coordinate geometry has been approximated using Bézier curves (${fit.geometry.nodes.length} nodes, largest deviation ${fit.maxError.toPrecision(2)} m).`;
+      } else {
+        body = createBody(sim.scene, { kind: 'points', points: r.points }, name);
+        body.panels = { count: r.panelCount, distribution: 'asImported' };
+      }
       body.sourceName = r.name ?? fileName;
       const id = body.id;
       sim.update((s) => void s.bodies.push(body));
       useUIStore.getState().select([id]);
-      toast(`Imported “${name}” with ${r.panelCount} panels. ${r.kuttaApplicable ? 'Sharp trailing edge found — Kutta condition applied.' : 'No sharp trailing edge — treated as non-lifting.'}`, 'success');
+      toast(`Imported “${name}” with ${asBezier ? count : r.panelCount} panels. ${r.kuttaApplicable ? 'Sharp trailing edge found — Kutta condition applied.' : 'No sharp trailing edge — treated as non-lifting.'}${approximation}`, 'success');
       close();
       setTimeout(fitToScene, 400);
     } catch (e) {
@@ -246,6 +262,13 @@ function ImportDialog() {
             aria-label="Coordinate text"
           />
           <div className="form__section" style={{ marginTop: 10 }}>
+            <label className="checkbox"><input type="checkbox" checked={asBezier} onChange={() => setAsBezier((v) => !v)} />Convert to editable Bézier curves</label>
+            {asBezier && (
+              <>
+                <label className="field field--inline"><span className="field__label">Fit tolerance</span><span className="field__input"><input type="number" min={0.001} max={5} step={0.01} value={tolPct} onChange={(e) => setTolPct(Math.max(0.001, Math.min(5, Number(e.target.value))))} aria-label="Approximation tolerance, percent of size" /><span className="field__unit">% of size</span></span></label>
+                <p className="form__hint">Imported coordinate geometry will be approximated using Bézier curves. Sharp corners (such as a trailing edge) stay sharp; a smaller tolerance uses more nodes.</p>
+              </>
+            )}
             <label className="field field--inline"><span className="field__label">Panels</span><span className="field__input"><input type="number" min={16} max={2000} value={count} onChange={(e) => setCount(Math.max(16, Math.min(2000, Number(e.target.value))))} /><span className="field__unit" /></span></label>
             <label className="field field--inline"><span className="field__label">Distribution</span><span className="field__input">
               <select value={distribution} onChange={(e) => setDistribution(e.target.value as PanelDistribution)}>
@@ -280,7 +303,8 @@ function ImportDialog() {
 
 function GeometryDialog() {
   const close = useUIStore((s) => s.closeDialog);
-  const [kind, setKind] = useState<'naca4' | 'circle' | 'ellipse' | 'joukowski'>('naca4');
+  const [kind, setKind] = useState<'bezier' | 'naca4' | 'circle' | 'ellipse' | 'joukowski'>('bezier');
+  const [template, setTemplate] = useState<BezierTemplate>('naca2412');
   const [code, setCode] = useState('2412');
   const [chord, setChord] = useState(1);
   const [radius, setRadius] = useState(1);
@@ -294,14 +318,21 @@ function GeometryDialog() {
 
   const geometry: BodyGeometry = useMemo(() => {
     switch (kind) {
+      case 'bezier': return templateGeometry(template);
       case 'naca4': return { kind, code, chord };
       case 'circle': return { kind, radius };
       case 'ellipse': return { kind, semiAxisX: a, semiAxisY: b };
       case 'joukowski': return { kind, thickness, camber };
     }
-  }, [kind, code, chord, radius, a, b, thickness, camber]);
+  }, [kind, template, code, chord, radius, a, b, thickness, camber]);
 
   useEffect(() => {
+    // Bézier templates are sampled locally: no solver round trip needed.
+    if (geometry.kind === 'bezier') {
+      setPreview(sampleBezier(geometry));
+      setError(null);
+      return;
+    }
     const client = solverRef.client;
     if (!client) return;
     const t = setTimeout(() => {
@@ -318,7 +349,10 @@ function GeometryDialog() {
     body.panels = { count, distribution: 'auto' };
     const id = body.id;
     sim.update((s) => void s.bodies.push(body));
-    useUIStore.getState().select([id]);
+    const ui = useUIStore.getState();
+    ui.select([id]);
+    // A Bézier body opens straight into editing: nodes to drag, or the pen for a blank one.
+    if (kind === 'bezier') ui.setTool(template === 'blank' ? 'pen' : 'node');
     close();
   };
 
@@ -327,12 +361,22 @@ function GeometryDialog() {
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
         <div className="form" style={{ padding: 0 }}>
           <div className="segmented" role="radiogroup" aria-label="Shape">
-            {(['naca4', 'circle', 'ellipse', 'joukowski'] as const).map((k) => (
+            {(['bezier', 'naca4', 'circle', 'ellipse', 'joukowski'] as const).map((k) => (
               <button key={k} role="radio" aria-checked={kind === k} className={kind === k ? 'is-active' : ''} onClick={() => setKind(k)}>
-                {k === 'naca4' ? 'NACA 4-digit' : k === 'circle' ? 'Cylinder' : k === 'ellipse' ? 'Ellipse' : 'Joukowski'}
+                {k === 'bezier' ? 'Editable (Bézier)' : k === 'naca4' ? 'NACA 4-digit' : k === 'circle' ? 'Cylinder' : k === 'ellipse' ? 'Ellipse' : 'Joukowski'}
               </button>
             ))}
           </div>
+          {kind === 'bezier' && (
+            <>
+              <label className="field field--inline"><span className="field__label">Template</span><span className="field__input">
+                <select value={template} onChange={(e) => setTemplate(e.target.value as BezierTemplate)} aria-label="Bézier template">
+                  {(Object.keys(TEMPLATE_LABELS) as BezierTemplate[]).map((t) => <option key={t} value={t}>{TEMPLATE_LABELS[t]}</option>)}
+                </select>
+              </span></label>
+              <p className="form__hint">Built from cubic Bézier curves you can reshape: drag nodes and handles with the Nodes tool and watch the flow respond. “Blank” starts an empty path for the Pen tool.</p>
+            </>
+          )}
           {kind === 'naca4' && (
             <>
               <label className="field field--inline"><span className="field__label">Code</span><span className="field__input"><input type="text" value={code} maxLength={4} onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))} aria-label="NACA code" /></span></label>
@@ -398,6 +442,7 @@ function ExportDialog() {
         <Row label="Surface Cp (CSV)" hint="Panel midpoints with x/c, surface side, tangential velocity, pressure, Cp and source strength — one file per body." disabled={!solution || solution.bodies.length === 0} onClick={() => solution?.bodies.forEach((b) => downloadText(`${base}_${safeFilename(b.name)}_surface.csv`, surfaceCsv(b, scene.conditions), 'text/csv'))} />
         <Row label="Geometry (CSV)" hint="World-space contour of each body as x,y rows, ready to re-import." disabled={!solution || solution.bodies.length === 0} onClick={() => solution?.bodies.forEach((b) => downloadText(`${base}_${safeFilename(b.name)}_geometry.csv`, geometryCsv(b.polygon), 'text/csv'))} />
         <Row label="Field data (CSV)" hint={`The currently displayed scalar field on its sample grid${scalar ? ` (${scalar.nx}×${scalar.ny})` : ''}, with a body mask column.`} disabled={!scalar} onClick={() => scalar && downloadText(`${base}_${scalar.field}.csv`, fieldCsv(scalar), 'text/csv')} />
+        <Row label="Bézier outline (CSV)" hint="Sampled world-space outline of each Bézier body, before panelisation." disabled={!scene.bodies.some((b) => b.geometry.kind === 'bezier')} onClick={() => scene.bodies.filter((b) => b.geometry.kind === 'bezier').forEach((b) => downloadText(`${base}_${safeFilename(b.name)}_outline.csv`, geometryCsv(bezierWorldPolygon(b) ?? []), 'text/csv'))} />
         <Row label="Canvas image (PNG)" hint="What you see: field, streamlines, geometry and overlays at screen resolution." onClick={() => { exportPng(); toast('Image exported.', 'success'); }} />
       </div>
       <p className="form__hint" style={{ marginTop: 12 }}>All exports are generated locally in your browser; nothing is uploaded.</p>

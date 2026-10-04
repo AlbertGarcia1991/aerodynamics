@@ -12,12 +12,12 @@ import {
   toRadians,
   writeParameter,
 } from './scene';
-import { SCENE_FORMAT_VERSION, type Element } from './types';
+import { BASE_FORMAT_VERSION, type Element } from './types';
 
 describe('scene helpers', () => {
   it('creates a versioned scene with default conditions', () => {
     const s = createScene('Test');
-    expect(s.version).toBe(SCENE_FORMAT_VERSION);
+    expect(s.version).toBe(BASE_FORMAT_VERSION);
     expect(s.conditions.density).toBeCloseTo(1.225);
     expect(s.elements).toEqual([]);
   });

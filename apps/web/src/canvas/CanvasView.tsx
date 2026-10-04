@@ -11,6 +11,7 @@ import { useVisualizationStore, type ColormapId } from '@/state/visualizationSto
 import type { FieldType } from '@/domain/types';
 import { FieldLayer } from '@/render/fieldLayer';
 import { COLORMAPS, colormapLUT, defaultColormapFor, sampleColormap } from '@/render/colormaps';
+import { validateCached } from '@/domain/bezier';
 import { drawOverlay, readThemeColors, type ThemeColors } from './overlay';
 import { CanvasInteraction, type Cursor } from './interaction';
 import { syncBodyCache } from './bodyCache';
@@ -96,6 +97,29 @@ function Legend({ range }: { range: [number, number] }) {
   );
 }
 
+/**
+ * Solver freshness and geometry validity (PRD2 §50, §62). The previous solution
+ * stays on screen while a new one is computed, but never silently: it is marked
+ * as updating until a result for the current scene revision arrives.
+ */
+function StatusBadges() {
+  const scene = useSimulationStore((s) => s.scene);
+  const sceneRev = useSimulationStore((s) => s.revision);
+  const solvedRev = useSolverStore((s) => s.solvedRevision);
+  const status = useSolverStore((s) => s.status);
+  const stale = status !== 'error' && (solvedRev !== sceneRev || status === 'running');
+  const invalid = scene.bodies.filter((b) => b.geometry.kind === 'bezier' && validateCached(b.geometry).status === 'invalid');
+  const open = scene.bodies.filter((b) => b.geometry.kind === 'bezier' && validateCached(b.geometry).status === 'open');
+  if (!stale && invalid.length === 0 && open.length === 0) return null;
+  return (
+    <div className="status-badges" role="status" aria-live="polite">
+      {invalid.length > 0 && <span className="badge badge--danger">Invalid geometry: {invalid.map((b) => b.name).join(', ')} excluded from the solve</span>}
+      {open.length > 0 && <span className="badge badge--warning">Open path: {open.map((b) => b.name).join(', ')} not solved until closed</span>}
+      {stale && <span className="badge">Updating flow…</span>}
+    </div>
+  );
+}
+
 function ProbeReadout() {
   const probe = useSolverStore((s) => s.probe);
   const scene = useSimulationStore((s) => s.scene);
@@ -154,12 +178,15 @@ function VizToolbar() {
         <button className={`btn${viz.streamlines.particles ? ' is-active' : ''}`} onClick={() => viz.updateStreamlines({ particles: !viz.streamlines.particles })} title="Animate particles along streamlines" disabled={!viz.streamlines.show}>Particles</button>
         <button className={`btn${viz.vectors.show ? ' is-active' : ''}`} onClick={() => viz.updateVectors({ show: !viz.vectors.show })} title="Velocity vectors (V)">Vectors</button>
         <button className={`btn${viz.showForces ? ' is-active' : ''}`} onClick={() => viz.toggle('showForces')} title="Force arrows on bodies and elements (O)" aria-pressed={viz.showForces}>Forces</button>
+        <button className={`btn${viz.showPanels ? ' is-active' : ''}`} onClick={() => viz.toggle('showPanels')} title="Show the panel mesh: vertices, normals, indices (K)" aria-pressed={viz.showPanels}>Panels</button>
         <button className={`btn${viz.showGrid ? ' is-active' : ''}`} onClick={() => viz.toggle('showGrid')} title="Grid (G)"><IconGrid size={14} /></button>
         <button className={`btn${more ? ' is-active' : ''}`} onClick={() => setMore((m) => !m)} title="More display options"><IconLayers size={14} /></button>
         <span style={{ width: 1, background: 'var(--border)', margin: '2px 2px' }} />
         <button className={`btn${tool === 'select' ? ' is-active' : ''}`} onClick={() => setTool('select')} title="Select / drag (Esc)"><IconPointer size={14} /></button>
         <button className={`btn${tool === 'pan' ? ' is-active' : ''}`} onClick={() => setTool('pan')} title="Pan (hold Space)"><IconHand size={14} /></button>
         <button className={`btn${tool === 'seed' ? ' is-active' : ''}`} onClick={() => setTool(tool === 'seed' ? 'select' : 'seed')} title="Place streamline seeds"><IconSeed size={14} /></button>
+        <button className={`btn${tool === 'node' ? ' is-active' : ''}`} onClick={() => setTool(tool === 'node' ? 'select' : 'node')} title="Edit Bézier nodes and handles (N)" aria-pressed={tool === 'node'}>Nodes</button>
+        <button className={`btn${tool === 'pen' ? ' is-active' : ''}`} onClick={() => setTool(tool === 'pen' ? 'select' : 'pen')} title="Pen: click for a node, click-drag for a smooth node, click the first node to close (P)" aria-pressed={tool === 'pen'}>Pen</button>
         <button className="btn" onClick={fitToScene} title="Fit to scene (F)"><IconFit size={14} /></button>
       </div>
       {more && (
@@ -356,6 +383,7 @@ export function CanvasView() {
         pendingAdd: ui.pendingAdd,
         reducedMotion: reducedMotionMq.matches,
         solution: solver.solution,
+        edit: { tool: ui.tool, selectedNodeIds: new Set(ui.selectedNodeIds), insertHint: interaction.view().insertHint },
       });
     };
     raf = requestAnimationFrame(frame);
@@ -375,6 +403,7 @@ export function CanvasView() {
       <canvas ref={glRef} aria-hidden="true" />
       <canvas ref={overlayRef} aria-hidden="true" />
       <VizToolbar />
+      <StatusBadges />
       <div className="canvas-hud">
         <ProbeReadout />
         {useVisualizationStore.getState().showLegend && <Legend range={range} />}

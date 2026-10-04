@@ -10,10 +10,16 @@
  * | viewport (pan/zoom)       | sample only                   |
  * | visualisation settings    | sample only                   |
  *
- * Every change first produces a **low-resolution preview** so the picture
- * follows the cursor during a drag; a **full-resolution pass** runs once input
- * has been idle for a moment. The client coalesces requests, so a drag never
- * queues more than one solve.
+ * Every change first produces a **low-resolution preview** (a coarser field;
+ * while dragging a Bézier edit, also fewer panels) so the picture follows the
+ * cursor; a **full-resolution pass** — including a re-solve at the configured
+ * panel count — runs once input has been idle for a moment (PRD2 §31). The client coalesces
+ * requests, so a drag never queues more than one solve.
+ *
+ * Every solve is tagged with the scene revision it was built from. Results
+ * older than the solution already shown are dropped, and a solution whose
+ * revision trails the scene is *stale*: the UI keeps it on screen but marks it
+ * "Updating…" (PRD2 §30, §62).
  */
 import type { Bounds, FieldRequest, StreamlineRequest } from '@/domain/types';
 import { useSimulationStore } from '@/state/simulationStore';
@@ -21,6 +27,7 @@ import { useSolverStore } from '@/state/solverStore';
 import { useUIStore } from '@/state/uiStore';
 import { useViewportStore } from '@/state/viewportStore';
 import { useVisualizationStore } from '@/state/visualizationStore';
+import { PREVIEW_PANELS } from '@/domain/bezier';
 import { expandBounds, visibleBounds, type Viewport } from '@/canvas/viewport';
 import type { SolverClient } from './client';
 import type { SamplingRequest } from './protocol';
@@ -79,10 +86,18 @@ export function startSolverBridge(client: SolverClient): () => void {
   let viewRev = -1;
   let idleTimer: ReturnType<typeof setTimeout> | null = null;
   let disposed = false;
+  /** A reduced-panel solve is on screen and a full-accuracy one is still owed. */
+  let fullSolvePending = false;
 
   const run = async (solve: boolean, preview: boolean) => {
     if (disposed) return;
-    const scene = useSimulationStore.getState().scene;
+    const { scene, revision, transaction } = useSimulationStore.getState();
+    // Preview mode is for *dragging* a Bézier edit (PRD2 §31): numeric edits and
+    // ordinary scenes keep their configured accuracy and reuse the influence matrix.
+    const dragging = transaction !== null && scene.bodies.some((b) => b.geometry.kind === 'bezier');
+    const reduced = solve && preview && dragging && scene.bodies.some((b) => b.panels.count > PREVIEW_PANELS && b.panels.distribution !== 'asImported');
+    if (reduced) fullSolvePending = true;
+    else if (solve) fullSolvePending = false;
     const vp = useViewportStore.getState();
     const viz = useVisualizationStore.getState();
     const solver = useSolverStore.getState();
@@ -90,11 +105,15 @@ export function startSolverBridge(client: SolverClient): () => void {
     if (solve) solver.setStatus('running');
     const t0 = performance.now();
     try {
-      const res = solve ? await client.solve(scene, sampling) : await client.sample(sampling);
+      const res = solve
+        ? await client.solve(scene, sampling, { revision, previewPanels: reduced ? PREVIEW_PANELS : undefined })
+        : await client.sample(sampling);
       if (disposed) return;
       const store = useSolverStore.getState();
       if (res.type === 'solved') {
-        store.setSolution(res.solution, performance.now() - t0);
+        // Never let an older revision overwrite a newer solution.
+        if (res.revision !== null && res.revision < store.solvedRevision) return;
+        store.setSolution(res.solution, performance.now() - t0, res.revision);
         if (res.solution.status === 'error') {
           store.clearSampled();
           return;
@@ -126,7 +145,7 @@ export function startSolverBridge(client: SolverClient): () => void {
     if (idleTimer) clearTimeout(idleTimer);
     idleTimer = setTimeout(() => {
       idleTimer = null;
-      void run(false, false);
+      void run(fullSolvePending, false);
     }, IDLE_MS);
   };
 

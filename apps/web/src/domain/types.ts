@@ -46,7 +46,36 @@ export interface SceneElement {
   element: Element;
 }
 
+export type NodeType = 'smooth' | 'corner' | 'symmetric';
+
+/**
+ * A Bézier anchor. Handles are stored **relative to the node** so moving a node
+ * moves its handles; a zero offset means "no handle" (a straight neighbour).
+ */
+export interface BezierNode {
+  id: string;
+  position: Vec2;
+  inHandle: Vec2;
+  outHandle: Vec2;
+  nodeType: NodeType;
+}
+
+/**
+ * Authoritative editable shape (PRD2 §8–§10). Cubic segment `i` runs from node
+ * `i` to node `i+1` (wrapping when `closed`); segments are derived, never
+ * stored, so they cannot disagree with the nodes. Panels are derived from this
+ * by sampling — the solver never sees the Bézier data.
+ */
+export interface BezierGeometry {
+  kind: 'bezier';
+  closed: boolean;
+  nodes: BezierNode[];
+  /** Max distance to the source points when fitted from imported coordinates. */
+  fitError?: number | null;
+}
+
 export type BodyGeometry =
+  | BezierGeometry
   | { kind: 'points'; points: Vec2[] }
   | { kind: 'naca4'; code: string; chord: number }
   | { kind: 'circle'; radius: number }
@@ -90,10 +119,15 @@ export interface SceneBody {
   sourceName?: string | null;
 }
 
-export const SCENE_FORMAT_VERSION = 1 as const;
+/** Newest format this build reads. v2 adds `bezier` body geometry (PRD2 §45); v1 files load unchanged. */
+export const SCENE_FORMAT_VERSION = 2 as const;
+/** Written for scenes without Bézier bodies, so they stay readable by the Rust solver and older builds. */
+export const BASE_FORMAT_VERSION = 1 as const;
+/** The format the Rust solver understands; Bézier bodies are sampled to `points` before it sees them. */
+export const SOLVER_FORMAT_VERSION = 1 as const;
 
 export interface Scene {
-  version: typeof SCENE_FORMAT_VERSION;
+  version: number;
   name: string;
   conditions: FlowConditions;
   elements: SceneElement[];

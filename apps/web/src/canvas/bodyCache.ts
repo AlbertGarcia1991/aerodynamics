@@ -8,6 +8,7 @@
  * outline therefore follows the cursor exactly even before the solve lands.
  */
 import type { SceneBody, Solution, Vec2 } from '@/domain/types';
+import { bezierWorldPolygon } from '@/domain/bezier';
 
 interface Cached {
   polygon: Vec2[];
@@ -30,8 +31,14 @@ export function syncBodyCache(solution: Solution | null, bodies: SceneBody[]): v
   }
 }
 
-/** The body's contour at its *current* transform, or `null` before the first solve. */
+/**
+ * The body's contour at its *current* transform, or `null` before the first
+ * solve. A Bézier body is its own source of truth: its outline is sampled from
+ * the curve every frame, so it follows an edit exactly rather than lagging the
+ * solver (PRD2 §110).
+ */
 export function currentPolygon(body: SceneBody): Vec2[] | null {
+  if (body.geometry.kind === 'bezier') return bezierWorldPolygon(body);
   const c = cache.get(body.id);
   if (!c) return null;
   const dr = body.rotation - c.rotation;

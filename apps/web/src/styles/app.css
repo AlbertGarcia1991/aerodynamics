@@ -1400,3 +1400,29 @@ body.is-resizing-y * {
     display: none;
   }
 }
+
+/* Solver freshness / geometry validity badges (PRD2 §50, §62) */
+.status-badges {
+  position: absolute;
+  bottom: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: center;
+  max-width: 55%;
+  pointer-events: none;
+  z-index: 3;
+}
+.badge {
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: var(--fs-xs);
+  background: var(--surface);
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+}
+.badge--danger { color: var(--danger); background: linear-gradient(var(--danger-soft), var(--danger-soft)), var(--surface); border-color: var(--danger); }
+.badge--warning { color: var(--warning); background: linear-gradient(var(--warning-soft), var(--warning-soft)), var(--surface); border-color: var(--warning); }
