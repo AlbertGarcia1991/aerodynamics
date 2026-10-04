@@ -158,6 +158,9 @@ impl BodyForces {
 pub struct ChordFrame {
     pub leading_edge: Vec2,
     pub trailing_edge: Vec2,
+    /// Contour vertex indices of the leading and trailing edge.
+    pub leading_index: usize,
+    pub trailing_index: usize,
     pub chord: f64,
     /// Unit vector leading edge → trailing edge.
     pub axis: Vec2,
@@ -177,14 +180,16 @@ impl ChordFrame {
         } else {
             Vec2::X
         };
-        let (le, te) = if a.dot(dir) <= b.dot(dir) {
-            (a, b)
+        let (le, te, li, ti) = if a.dot(dir) <= b.dot(dir) {
+            (a, b, i, j)
         } else {
-            (b, a)
+            (b, a, j, i)
         };
         Self {
             leading_edge: le,
             trailing_edge: te,
+            leading_index: li,
+            trailing_index: ti,
             chord: if chord > 0.0 { chord } else { 1.0 },
             axis: (te - le).normalized(),
         }
@@ -195,8 +200,30 @@ impl ChordFrame {
         (p - self.leading_edge).dot(self.axis) / self.chord
     }
 
+    /// Surface of panel `i` of an `n`-panel counter-clockwise contour, decided
+    /// by topology: the arc from the trailing edge round to the leading edge is
+    /// the upper surface, the rest the lower.
+    ///
+    /// Unlike [`Self::surface`] this stays correct for strongly cambered or
+    /// reflexed shapes, whose surfaces can both lie on one side of the straight
+    /// chord line (which makes upper and lower interleave in a Cp-vs-x/c plot).
+    pub fn surface_of_panel(&self, i: usize, n: usize) -> Surface {
+        if n == 0 {
+            return Surface::Upper;
+        }
+        let from_te = (i + n - self.trailing_index % n) % n;
+        let te_to_le = (self.leading_index + n - self.trailing_index) % n;
+        if from_te < te_to_le {
+            Surface::Upper
+        } else {
+            Surface::Lower
+        }
+    }
+
     /// Side of the chord line. Positive cross product means the point lies to
-    /// the left of leading→trailing, i.e. the upper surface.
+    /// the left of leading→trailing, i.e. the upper surface. Only reliable for
+    /// shapes whose surfaces do not cross the chord line; see
+    /// [`Self::surface_of_panel`].
     #[inline]
     pub fn surface(&self, p: Vec2) -> Surface {
         if self.axis.cross(p - self.leading_edge) >= 0.0 {
@@ -234,7 +261,7 @@ pub fn surface_points(
             panel_length: panel.length,
             arc_length: arc + 0.5 * panel.length,
             x_over_c: frame.station(panel.mid),
-            surface: frame.surface(panel.mid),
+            surface: frame.surface_of_panel(i, panels.len()),
             tangential_velocity: vt,
             normal_velocity: vn,
             pressure: conditions.pressure_at_speed(speed),
@@ -555,6 +582,35 @@ mod tests {
         for p in poly.points.iter().filter(|p| p.y > 1e-3) {
             assert_eq!(frame.surface(*p), Surface::Upper);
         }
+    }
+
+    #[test]
+    fn surfaces_of_a_strongly_cambered_shape_are_split_by_arc_not_by_chord_line() {
+        // A thin crescent: both surfaces curve above the straight LE→TE line,
+        // so the chord-line test calls everything "upper".
+        let n = 80;
+        let mut pts = Vec::new();
+        for k in 0..=n {
+            let x = 1.0 - k as f64 / n as f64; // TE → LE along the top
+            pts.push(Vec2::new(x, 0.9 * (x * (1.0 - x)) * 4.0 * 0.5 + 0.01 * (x * (1.0 - x))));
+        }
+        for k in 1..n {
+            let x = k as f64 / n as f64; // LE → TE along the bottom
+            pts.push(Vec2::new(x, 0.9 * (x * (1.0 - x)) * 4.0 * 0.5 - 0.01 * (x * (1.0 - x))));
+        }
+        let poly = Polygon::new(pts);
+        let frame = ChordFrame::new(&poly, Vec2::X);
+        let m = poly.points.len();
+        let chord_line_upper = poly
+            .points
+            .iter()
+            .filter(|p| frame.surface(**p) == Surface::Upper)
+            .count();
+        assert!(chord_line_upper > m - 4, "the old rule lumps both surfaces together");
+        let upper = (0..m)
+            .filter(|&i| frame.surface_of_panel(i, m) == Surface::Upper)
+            .count();
+        assert!((upper as i64 - (m - upper) as i64).abs() <= 3, "upper {upper} of {m}");
     }
 
     #[test]
