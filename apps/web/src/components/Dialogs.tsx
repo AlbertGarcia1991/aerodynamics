@@ -98,14 +98,15 @@ function WelcomeDialog() {
     >
       <p style={{ fontSize: 'var(--fs-lg)', marginTop: 0 }}>Build a flow in seconds.</p>
       <p>
-        Place sources, sinks, vortices and doublets, or drop in an airfoil, and watch the potential-flow solution respond as you drag. The solver is a
+        Place sources, sinks, vortices and doublets, drop in an airfoil, or draw and reshape your own body with Bézier curves, and watch the potential-flow solution respond as you drag. The solver is a
         Hess–Smith panel method running in WebAssembly; every result comes with its diagnostics.
       </p>
       <ul style={{ paddingLeft: 18, color: 'var(--text-muted)' }}>
         <li><b>Drag</b> any object; <b>scroll</b> to zoom; drag the background to pan.</li>
+        <li><b>Draw your own shape:</b> <i>Add → Create geometry → Editable (Bézier)</i>, then drag its nodes (<kbd>N</kbd>) or sketch with the pen (<kbd>P</kbd>).</li>
         <li>Switch fields with the toolbar on the canvas, or keys <kbd>1</kbd>–<kbd>7</kbd>.</li>
         <li>Select a body to read lift, drag, CL, CD, Cm — and why drag is ~0.</li>
-        <li>Press <kbd>?</kbd> for all shortcuts.</li>
+        <li>Press <kbd>?</kbd> for all shortcuts; the book icon at the top right opens the full user guide.</li>
       </ul>
       <p className="muted" style={{ fontSize: 'var(--fs-xs)' }}>A cylinder is already loaded behind this dialog.</p>
     </Dialog>
@@ -471,6 +472,7 @@ function AboutDialog() {
       <p>
         AeroFlow is an interactive 2D potential-flow simulator. Elementary singularities are evaluated analytically; arbitrary closed bodies are solved with a
         Hess–Smith constant-strength source/vortex panel method, assembled as one global system for all bodies, with a Kutta condition at sharp trailing edges.
+        Bodies can be generated (NACA, cylinder, ellipse, Joukowski), imported from coordinates, or drawn and edited as cubic Bézier curves.
       </p>
       <dl className="kv">
         <dt>Solver core</dt><dd>Rust → WebAssembly</dd><dd className="unit" />
@@ -484,6 +486,7 @@ function AboutDialog() {
         <li>Kutta–Joukowski lift for a spinning cylinder (−0.4 %)</li>
         <li>NACA 0012 at 5°: CL 0.6025 vs XFOIL ≈ 0.600; NACA 2412 Cm −0.054</li>
         <li>Joukowski conformal-mapping lift (documented first-order convergence)</li>
+        <li>Bézier bodies: a circle gives Cp<sub>min</sub> ≈ −3 with no lift; a Bézier NACA 2412 gives CL 0.254 vs 0.254 from the generated section</li>
       </ul>
       <h3 style={{ fontSize: 'var(--fs-sm)', marginBottom: 4 }}>Assumptions</h3>
       <ul style={{ paddingLeft: 18, color: 'var(--text-muted)', margin: 0 }}>

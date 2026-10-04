@@ -12,6 +12,7 @@ import {
   IconChevronDown,
   IconDownload,
   IconFolder,
+  IconBook,
   IconHelp,
   IconMonitor,
   IconMoon,
@@ -28,6 +29,9 @@ import {
 
 /** Stable empty fallbacks: zustand selectors must not return a fresh array each call. */
 const EMPTY: never[] = [];
+
+/** GitHub renders the README (with its screenshots) as the user guide. */
+const README_URL = 'https://github.com/AlbertGarcia1991/aerodynamics#readme';
 
 function Menu({ label, icon, children, align = 'left', primary = false, ariaLabel }: {
   label: ReactNode;
@@ -274,6 +278,7 @@ export function TopBar() {
             <>
               <button className="menu__item" role="menuitem" onClick={() => { close(); useUIStore.getState().openHelp('assumptions'); }}>Model assumptions</button>
               <button className="menu__item" role="menuitem" onClick={() => { close(); useUIStore.getState().openHelp('panelMethod'); }}>How the solver works</button>
+              <button className="menu__item" role="menuitem" onClick={() => { close(); useUIStore.getState().openHelp('bezier'); }}>Editing custom shapes (Bézier)</button>
               <button className="menu__item" role="menuitem" onClick={() => { close(); useUIStore.getState().openDialog('shortcuts'); }}>Keyboard shortcuts<small>?</small></button>
               <div className="menu__sep" />
               <button className="menu__item" role="menuitem" onClick={() => { close(); useUIStore.getState().openDialog('welcome'); }}>Welcome tour</button>
@@ -281,6 +286,9 @@ export function TopBar() {
             </>
           )}
         </Menu>
+        <a className="icon-btn" href={README_URL} target="_blank" rel="noopener noreferrer" aria-label="Open the README (user guide) on GitHub" title="README — user guide (opens GitHub)">
+          <IconBook size={16} />
+        </a>
       </div>
     </header>
   );

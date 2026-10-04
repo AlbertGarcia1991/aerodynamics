@@ -60,3 +60,6 @@ export const IconPanelBottom = (p: P) => base(p, <><rect x="3" y="4" width="18" 
 export const IconChart = (p: P) => base(p, <><path d="M3 20h18M6 17V10M11 17V5M16 17v-7" /></>);
 export const IconMore = (p: P) => base(p, <><circle cx="12" cy="5" r="1.2" /><circle cx="12" cy="12" r="1.2" /><circle cx="12" cy="19" r="1.2" /></>);
 export const IconRotate = (p: P) => base(p, <><path d="M20 12a8 8 0 1 1-2.3-5.7" /><path d="M20 4v5h-5" /></>);
+
+export const IconBook = (p: P) =>
+  base(p, <><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v16H6.5A2.5 2.5 0 0 0 4 21.5z" /><path d="M4 21.5V5.5" /><path d="M9 8h7" /></>);

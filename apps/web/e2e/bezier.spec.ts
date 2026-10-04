@@ -190,6 +190,19 @@ test.describe('Bézier geometry editor (PRD2)', () => {
     expect(reversals).toBeLessThan(3);
   });
 
+  test('Help covers the Bézier editor and a README button links to the rendered guide', async ({ page }) => {
+    await openApp(page);
+    await page.getByRole('banner').getByRole('button', { name: 'Help', exact: true }).click();
+    await page.getByRole('menuitem', { name: /Editing custom shapes/ }).click();
+    const drawer = page.getByRole('dialog', { name: 'Help' });
+    await expect(drawer).toContainText('Custom shapes (Bézier curves)');
+    await expect(drawer).toContainText('Node tool');
+    const readme = page.getByRole('link', { name: /README/ });
+    await expect(readme).toHaveAttribute('href', /github\.com\/AlbertGarcia1991\/aerodynamics#readme/);
+    await expect(readme).toHaveAttribute('target', '_blank');
+    await expect(readme).toHaveAttribute('rel', /noopener/);
+  });
+
   test('the pen draws a closed body that is solved (§116.2–8)', async ({ page }) => {
     await openApp(page);
     await emptyScene(page);
