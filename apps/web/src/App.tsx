@@ -3,6 +3,7 @@ import { SolverClient } from '@/solver/client';
 import { createProbeThrottle, startSolverBridge } from '@/solver/bridge';
 import { useSolverStore } from '@/state/solverStore';
 import { useUIStore } from '@/state/uiStore';
+import { useViewportStore } from '@/state/viewportStore';
 import { useSimulationStore } from '@/state/simulationStore';
 import { TopBar } from '@/components/TopBar';
 import { ObjectsPanel } from '@/components/ObjectsPanel';
@@ -27,7 +28,7 @@ const FIRST_RUN_KEY = 'aeroflow.seen-welcome';
 
 // Development-only handle for end-to-end tests and console debugging.
 if (import.meta.env.DEV) {
-  (window as unknown as { __aeroflow?: unknown }).__aeroflow = { useSimulationStore, useSolverStore, useUIStore };
+  (window as unknown as { __aeroflow?: unknown }).__aeroflow = { useSimulationStore, useSolverStore, useUIStore, useViewportStore };
 }
 
 export function App() {

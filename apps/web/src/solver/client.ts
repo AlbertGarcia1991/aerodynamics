@@ -22,7 +22,17 @@ import type {
   ValidationResult,
   Vec2,
 } from '@/domain/types';
+import { toSolverGeometry, toSolverScene } from '@/domain/bezier';
 import type { SampledResponse, SamplingRequest, SolvedResponse, WorkerRequest, WorkerResponse } from './protocol';
+
+/** A result tagged with the scene revision it was computed for (PRD2 §30), so stale results can be recognised. */
+export type Revisioned<T> = T & { revision: number | null };
+export interface SolveOptions {
+  /** Scene revision this request was built from. */
+  revision?: number;
+  /** Cap the panel count for the fast interactive pass (PRD2 §31). */
+  previewPanels?: number;
+}
 
 type Resolver<T> = { resolve: (v: T) => void; reject: (e: Error) => void };
 
@@ -36,9 +46,10 @@ interface Pending {
   onProgress?: (p: SweepPoint, done: number, total: number) => void;
 }
 
+type Result = Revisioned<SolvedResponse | SampledResponse>;
 type QueuedWork =
-  | { kind: 'solve'; scene: Scene; sampling: SamplingRequest; waiters: Resolver<SolvedResponse | SampledResponse>[] }
-  | { kind: 'sample'; sampling: SamplingRequest; waiters: Resolver<SolvedResponse | SampledResponse>[] };
+  | { kind: 'solve'; scene: Scene; opts: SolveOptions; sampling: SamplingRequest; waiters: Resolver<Result>[] }
+  | { kind: 'sample'; sampling: SamplingRequest; waiters: Resolver<Result>[] };
 
 export class SolverClient {
   private worker: Worker;
@@ -95,24 +106,26 @@ export class SolverClient {
   /**
    * Solve `scene` and sample the requested fields. If a solve is already in
    * flight the request is queued, replacing any earlier queued work; all
-   * waiters receive the result of the final request.
+   * waiters receive the result of the final request, tagged with *its* revision.
+   * Bézier bodies are sampled to panels here, at the last moment, so the
+   * solver only ever sees validated derived geometry (PRD2 §23, §63).
    */
-  solve(scene: Scene, sampling: SamplingRequest): Promise<SolvedResponse | SampledResponse> {
+  solve(scene: Scene, sampling: SamplingRequest, opts: SolveOptions = {}): Promise<Result> {
     return new Promise((resolve, reject) => {
       const waiter = { resolve, reject };
       if (this.queued) {
         const w = this.queued.waiters;
         w.push(waiter);
-        this.queued = { kind: 'solve', scene, sampling: { ...this.queued.sampling, ...sampling }, waiters: w };
+        this.queued = { kind: 'solve', scene, opts, sampling: { ...this.queued.sampling, ...sampling }, waiters: w };
       } else {
-        this.queued = { kind: 'solve', scene, sampling, waiters: [waiter] };
+        this.queued = { kind: 'solve', scene, opts, sampling, waiters: [waiter] };
       }
       this.pump();
     });
   }
 
   /** Re-sample fields for the existing solution (pan/zoom/field switch). */
-  sample(sampling: SamplingRequest): Promise<SolvedResponse | SampledResponse> {
+  sample(sampling: SamplingRequest): Promise<Result> {
     return new Promise((resolve, reject) => {
       const waiter = { resolve, reject };
       if (this.queued) {
@@ -132,11 +145,12 @@ export class SolverClient {
     this.inFlight = true;
     const req: RequestBody =
       work.kind === 'solve'
-        ? { type: 'solve', scene: work.scene, sampling: work.sampling }
+        ? { type: 'solve', scene: toSolverScene(work.scene, work.opts.previewPanels), sampling: work.sampling }
         : { type: 'sample', sampling: work.sampling };
     this.request(req)
       .then((res) => {
-        for (const w of work.waiters) w.resolve(res as SolvedResponse | SampledResponse);
+        const tagged = { ...res, revision: work.kind === 'solve' ? (work.opts.revision ?? null) : null } as Result;
+        for (const w of work.waiters) w.resolve(tagged);
       })
       .catch((e: Error) => {
         for (const w of work.waiters) w.reject(e);
@@ -185,7 +199,7 @@ export class SolverClient {
   }
 
   async generateGeometry(spec: BodyGeometry, count: number): Promise<Vec2[]> {
-    const r = (await this.request({ type: 'generateGeometry', spec, count })) as Extract<
+    const r = (await this.request({ type: 'generateGeometry', spec: toSolverGeometry(spec), count })) as Extract<
       WorkerResponse,
       { type: 'generated' }
     >;

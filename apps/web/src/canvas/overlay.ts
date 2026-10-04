@@ -6,7 +6,9 @@
 import type { Scene, SceneBody, SceneElement, Solution, StreamlinesResult, Vec2, VectorFieldResult } from '@/domain/types';
 import { elementPosition } from '@/domain/scene';
 import type { VisualizationStore } from '@/state/visualizationStore';
+import { validateCached } from '@/domain/bezier';
 import { bodyRadius, currentPolygon, reposePoint } from './bodyCache';
+import { drawBezierEdit, type EditVisual } from './bezierEdit';
 import { formatCoordinate, niceStep, visibleBounds, worldToScreen, type Viewport } from './viewport';
 import { sampleColormap } from '@/render/colormaps';
 
@@ -26,6 +28,7 @@ export interface ThemeColors {
   handle: string;
   surface: string;
   force: string;
+  danger: string;
 }
 
 export function readThemeColors(): ThemeColors {
@@ -47,6 +50,7 @@ export function readThemeColors(): ThemeColors {
     handle: v('--handle'),
     surface: v('--surface'),
     force: v('--force'),
+    danger: v('--danger'),
   };
 }
 
@@ -73,6 +77,8 @@ export interface OverlayState {
   reducedMotion: boolean;
   /** Latest solution, for force arrows (may lag the scene by a frame during a drag). */
   solution: Solution | null;
+  /** Bézier editing layer state (PRD2 §38). */
+  edit: EditVisual;
 }
 
 export const GLYPH_RADIUS = 11;
@@ -87,6 +93,7 @@ export function drawOverlay(ctx: CanvasRenderingContext2D, s: OverlayState): voi
   if (s.streamlines && s.viz.streamlines.show) drawStreamlines(ctx, s);
   if (s.vectors && s.viz.vectors.show) drawVectors(ctx, s);
   drawBodies(ctx, s);
+  if (s.viz.showPanels && s.solution) drawPanels(ctx, s);
   drawElements(ctx, s);
   drawSeeds(ctx, s);
   if (s.viz.showForces && s.solution) drawForces(ctx, s);
@@ -291,14 +298,49 @@ function drawVectors(ctx: CanvasRenderingContext2D, s: OverlayState) {
   }
 }
 
-function tracePolygon(ctx: CanvasRenderingContext2D, poly: Vec2[], vp: Viewport) {
+function tracePolygon(ctx: CanvasRenderingContext2D, poly: Vec2[], vp: Viewport, close = true) {
   ctx.beginPath();
   poly.forEach((p, i) => {
     const q = worldToScreen(p, vp);
     if (i === 0) ctx.moveTo(q.x, q.y);
     else ctx.lineTo(q.x, q.y);
   });
-  ctx.closePath();
+  if (close) ctx.closePath();
+}
+
+/** Panel mesh (PRD2 §25): vertices, outward normals at panel centres, and indices when the mesh is coarse enough to read. */
+function drawPanels(ctx: CanvasRenderingContext2D, s: OverlayState) {
+  const { vp, colors, solution } = s;
+  if (!solution) return;
+  ctx.save();
+  ctx.fillStyle = colors.accent;
+  ctx.strokeStyle = colors.accent;
+  ctx.lineWidth = 1;
+  ctx.font = '9px ui-monospace, SFMono-Regular, Menlo, monospace';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  for (const r of solution.bodies) {
+    const body = s.scene.bodies.find((b) => b.id === r.id);
+    if (!body?.visible) continue;
+    for (const v of r.polygon) {
+      const q = worldToScreen(v, vp);
+      ctx.beginPath();
+      ctx.arc(q.x, q.y, 2.2, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    const label = r.surface.length <= 64;
+    r.surface.forEach((sp, i) => {
+      const c = worldToScreen(sp.position, vp);
+      // Screen y points down, so the world normal's y flips.
+      const tip = { x: c.x + sp.normal.x * 10, y: c.y - sp.normal.y * 10 };
+      ctx.beginPath();
+      ctx.moveTo(c.x, c.y);
+      ctx.lineTo(tip.x, tip.y);
+      ctx.stroke();
+      if (label) ctx.fillText(String(i), c.x + sp.normal.x * 19, c.y - sp.normal.y * 19);
+    });
+  }
+  ctx.restore();
 }
 
 export function rotationHandleWorld(body: SceneBody): Vec2 | null {
@@ -323,13 +365,19 @@ function drawBodies(ctx: CanvasRenderingContext2D, s: OverlayState) {
       ctx.setLineDash([]);
       continue;
     }
-    tracePolygon(ctx, poly, vp);
-    ctx.fillStyle = colors.bodyFill;
-    ctx.fill();
+    // An open or invalid Bézier path is not a solvable body: draw it as an outline only.
+    const status = body.geometry.kind === 'bezier' ? validateCached(body.geometry).status : 'ok';
+    tracePolygon(ctx, poly, vp, status !== 'open');
+    if (status === 'ok') {
+      ctx.fillStyle = colors.bodyFill;
+      ctx.fill();
+    }
     ctx.lineWidth = selected ? 2.2 : hovered ? 1.8 : 1.2;
-    ctx.strokeStyle = selected ? colors.select : hovered ? colors.accent : colors.bodyStroke;
-    ctx.setLineDash([]);
+    ctx.strokeStyle = status === 'invalid' ? colors.danger : selected ? colors.select : hovered ? colors.accent : colors.bodyStroke;
+    ctx.setLineDash(status === 'open' ? [6, 4] : []);
     ctx.stroke();
+    ctx.setLineDash([]);
+    if (selected && body.geometry.kind === 'bezier') drawBezierEdit(ctx, body, vp, colors, s.edit);
 
     if (selected) {
       // Origin cross and rotation handle.

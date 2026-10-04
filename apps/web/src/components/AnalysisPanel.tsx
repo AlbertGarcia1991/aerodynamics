@@ -45,8 +45,10 @@ function SurfaceTab() {
   const u = conditions.velocity || 1;
   const value = (sp: BodyResult['surface'][number]) =>
     quantity === 'cp' ? (sp.cp ?? NaN) : quantity === 'velocity' ? Math.abs(sp.tangentialVelocity) / u : sp.pressure - conditions.pressure;
-  const upper = body.surface.filter((s) => s.surface === 'upper').map((s) => ({ x: s.xOverC, y: value(s) })).sort((a, b) => a.x - b.x);
-  const lower = body.surface.filter((s) => s.surface === 'lower').map((s) => ({ x: s.xOverC, y: value(s) })).sort((a, b) => a.x - b.x);
+  // Plot in contour order, not sorted by x: a strongly cambered or reflexed surface can fold back in x,
+  // and re-sorting would interleave its points into a zigzag. The contour runs TE → upper → LE → lower → TE.
+  const upper = body.surface.filter((s) => s.surface === 'upper').map((s) => ({ x: s.xOverC, y: value(s) })).reverse();
+  const lower = body.surface.filter((s) => s.surface === 'lower').map((s) => ({ x: s.xOverC, y: value(s) }));
   const series: Series[] = [
     { id: 'upper', label: 'Upper', color: UPPER, points: upper },
     { id: 'lower', label: 'Lower', color: LOWER, points: lower },

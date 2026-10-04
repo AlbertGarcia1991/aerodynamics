@@ -36,6 +36,8 @@ export interface SolverStore {
   metadata: SolverMetadata | null;
   status: SolverStatus;
   solution: Solution | null;
+  /** Scene revision the current solution was computed for; compare with the simulation revision to detect staleness. */
+  solvedRevision: number;
   scalar: ScalarFieldResult | null;
   scalarGrid: SampledGrid | null;
   vectors: VectorFieldResult | null;
@@ -53,7 +55,7 @@ export interface SolverStore {
   setReady(metadata: SolverMetadata): void;
   setInitError(message: string): void;
   setStatus(status: SolverStatus): void;
-  setSolution(solution: Solution, roundTripMs: number): void;
+  setSolution(solution: Solution, roundTripMs: number, revision?: number | null): void;
   setSampled(data: {
     scalar?: ScalarFieldResult;
     scalarGrid?: SampledGrid;
@@ -80,6 +82,7 @@ export const useSolverStore = create<SolverStore>((set) => ({
   metadata: null,
   status: 'idle',
   solution: null,
+  solvedRevision: -1,
   scalar: null,
   scalarGrid: null,
   vectors: null,
@@ -96,9 +99,10 @@ export const useSolverStore = create<SolverStore>((set) => ({
   setReady: (metadata) => set({ ready: true, metadata, initError: null }),
   setInitError: (initError) => set({ initError, ready: false }),
   setStatus: (status) => set({ status }),
-  setSolution: (solution, roundTripMs) =>
+  setSolution: (solution, roundTripMs, revision) =>
     set((s) => ({
       solution,
+      solvedRevision: revision ?? s.solvedRevision,
       status: solution.status,
       lastSolveMs: solution.diagnostics.timings.totalMs,
       lastRoundTripMs: roundTripMs,
